@@ -13,6 +13,7 @@ from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
 from genesis_core.mission_engine import MissionEngine, MissionEngineError
 from genesis_core.memory import MemoryError, MemoryStore
+from genesis_core.conversation_memory import ConversationMemoryEngine, ConversationMemoryError
 from genesis_core.state import StateStore
 from genesis_core.tools import ToolError
 
@@ -23,6 +24,7 @@ agent = AgentRuntime(store=store, tool_executor=tool_executor)
 mission_store = MissionStore(state=store)
 mission_engine = MissionEngine(store, mission_store, agent)
 memory_store = MemoryStore(store)
+conversation_memory = ConversationMemoryEngine(store, memory_store)
 
 
 class SessionInput(BaseModel):
@@ -41,6 +43,10 @@ class MissionInput(BaseModel):
 
 class MissionStatusInput(BaseModel):
     status: str
+
+
+class MemoryCandidateDecisionInput(BaseModel):
+    decision: str
 
 
 class MemoryInput(BaseModel):
@@ -169,6 +175,36 @@ def capture_mission_memory(mission_id: str) -> dict:
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Mission not found") from exc
     except MemoryError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/sessions/{session_id}/memory-extract")
+def extract_conversation_memories(session_id: str) -> dict:
+    try:
+        return {"candidates": conversation_memory.extract(session_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Conversation not found") from exc
+    except ConversationMemoryError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ModelError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/memory-candidates")
+def list_memory_candidates(session_id: str | None = None, status: str = "pending") -> dict:
+    try:
+        return {"candidates": conversation_memory.list_candidates(session_id, status)}
+    except ConversationMemoryError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/memory-candidates/{candidate_id}")
+def review_memory_candidate(candidate_id: str, payload: MemoryCandidateDecisionInput) -> dict:
+    try:
+        return {"candidate": conversation_memory.decide(candidate_id, payload.decision)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Memory candidate not found") from exc
+    except ConversationMemoryError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
