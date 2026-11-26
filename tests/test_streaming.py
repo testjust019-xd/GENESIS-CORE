@@ -95,8 +95,12 @@ def test_studio_stream_endpoint_sends_sse_delta_and_final_message(tmp_path, monk
 
     monkeypatch.setattr(web, "agent", FakeAgent())
     response = web.stream_message(session["id"], web.MessageInput(content="Hi"))
-    frames = list(response.body_iterator)
-    body = "".join(frames)
+    import asyncio
+
+    async def collect_frames():
+        return [frame async for frame in response.body_iterator]
+
+    body = "".join(asyncio.run(collect_frames()))
 
     assert response.media_type == "text/event-stream"
     assert '"type": "delta"' in body
