@@ -99,7 +99,6 @@ class ConversationMemoryEngine:
             raise ConversationMemoryError("The model returned invalid JSON; no memories were saved.") from exc
         if not isinstance(payload, dict) or not isinstance(payload.get("candidates"), list):
             raise ConversationMemoryError("The model response did not contain a candidates list.")
-        by_id = {str(m["id"]): m for m in user_messages}
         saved: list[dict[str, Any]] = []
         for candidate in payload["candidates"][:6]:
             if not isinstance(candidate, dict):
