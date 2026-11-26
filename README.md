@@ -83,6 +83,10 @@ Runtime discovery checks local endpoints for Ollama, llama.cpp and LM Studio. UR
 
 GENESIS supports a self-hosted SearXNG instance. Configure it in Studio under **Search Provider**, or run `genesis search set searxng --url http://127.0.0.1:8080`. Use `genesis search set offline` to return to local Knowledge Base search. Environment variables `GENESIS_SEARCH_PROVIDER` and `GENESIS_SEARXNG_URL` override saved settings. See [docs/SEARXNG.md](docs/SEARXNG.md).
 
+## First real-world verification
+
+After the offline test suite passes, follow [docs/REAL_WORLD_TEST.md](docs/REAL_WORLD_TEST.md) to connect one local model, test Studio streaming, verify memory and permissions, and configure optional SearXNG. CI uses mocks; real inference and hardware behavior must be checked on the target machine.
+
 ## Current boundaries
 
 The agent loop and mission execution are deliberately bounded. Only registered tools are available; shell execution, unrestricted network access and self-modification are not enabled by default. Elevated actions require approval. Research evidence is untrusted until reviewed. Skills are declarative instructions rather than executable code. Learning XP tracks progress and does not change model weights or prove intelligence. If no model is reachable, GENESIS reports a provider error rather than simulating an answer.
