@@ -79,6 +79,10 @@ genesis --help
 
 Runtime discovery checks local endpoints for Ollama, llama.cpp and LM Studio. URLs can be overridden with `GENESIS_OLLAMA_URL`, `GENESIS_LLAMA_CPP_URL` and `GENESIS_LM_STUDIO_URL`.
 
+## Web research with SearXNG
+
+GENESIS supports a self-hosted SearXNG instance. Configure it in Studio under **Search Provider**, or run `genesis search set searxng --url http://127.0.0.1:8080`. Use `genesis search set offline` to return to local Knowledge Base search. Environment variables `GENESIS_SEARCH_PROVIDER` and `GENESIS_SEARXNG_URL` override saved settings. See [docs/SEARXNG.md](docs/SEARXNG.md).
+
 ## Current boundaries
 
 The agent loop and mission execution are deliberately bounded. Only registered tools are available; shell execution, unrestricted network access and self-modification are not enabled by default. Elevated actions require approval. Research evidence is untrusted until reviewed. Skills are declarative instructions rather than executable code. Learning XP tracks progress and does not change model weights or prove intelligence. If no model is reachable, GENESIS reports a provider error rather than simulating an answer.
