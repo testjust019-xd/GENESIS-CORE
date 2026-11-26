@@ -10,11 +10,13 @@ from genesis_core import __version__
 from genesis_core.agent import AgentRuntime, ModelError
 from genesis_core.hardware import inspect_hardware
 from genesis_core.models import discover_runtimes
+from genesis_core.missions import MissionError, MissionStore
 from genesis_core.state import StateStore
 
 app = FastAPI(title="GENESIS CORE Studio", version=__version__)
 store = StateStore()
 agent = AgentRuntime(store=store)
+mission_store = MissionStore(state=store)
 
 
 class SessionInput(BaseModel):
@@ -23,6 +25,16 @@ class SessionInput(BaseModel):
 
 class MessageInput(BaseModel):
     content: str = Field(min_length=1, max_length=20000)
+
+
+class MissionInput(BaseModel):
+    title: str = Field(min_length=1, max_length=160)
+    description: str = Field(default="", max_length=10000)
+    priority: int = Field(default=3, ge=1, le=5)
+
+
+class MissionStatusInput(BaseModel):
+    status: str
 
 
 @app.get("/api/status")
@@ -72,6 +84,34 @@ def add_message(session_id: str, payload: MessageInput) -> dict:
         "model": reply.model,
         "agent_runtime": "ready",
     }
+
+
+@app.get("/api/missions")
+def list_missions(status: str | None = None) -> dict:
+    try:
+        return {"missions": mission_store.list(status=status)}
+    except MissionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/missions")
+def create_mission(payload: MissionInput) -> dict:
+    try:
+        return {"mission": mission_store.create(
+            payload.title, payload.description, payload.priority
+        )}
+    except MissionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.patch("/api/missions/{mission_id}")
+def update_mission(mission_id: str, payload: MissionStatusInput) -> dict:
+    try:
+        return {"mission": mission_store.set_status(mission_id, payload.status)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Mission not found") from exc
+    except MissionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/", response_class=HTMLResponse)
