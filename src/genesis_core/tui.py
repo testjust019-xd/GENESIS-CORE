@@ -11,6 +11,7 @@ from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
 from genesis_core.mission_engine import MissionEngine, MissionEngineError
 from genesis_core.memory import MemoryError, MemoryStore
+from genesis_core.conversation_memory import ConversationMemoryEngine, ConversationMemoryError
 from genesis_core.state import StateStore
 from genesis_core.tools import ApprovalStore, PermissionManager, ToolExecutor, build_core_registry
 
@@ -34,6 +35,7 @@ def run_tui() -> int:
     agent = AgentRuntime(store=store, tool_executor=tool_executor)
     mission_engine = MissionEngine(store, missions, agent)
     memories = MemoryStore(store)
+    conversation_memory = ConversationMemoryEngine(store, memories)
     current = None
     sessions = store.list_sessions(limit=1)
     if sessions:
@@ -99,6 +101,10 @@ def run_tui() -> int:
                 "  /memory list [type]  List active memories\n"
                 "  /memory search <text> Search active memories\n"
                 "  /memory add <type> <text> Save an explicit memory\n"
+                "  /memory mission <id> Capture a completed mission as an episode\n"
+                "  /memory extract [session-id] Propose conversation memories\n"
+                "  /memory candidates [session-id] List pending proposals\n"
+                "  /memory candidate <id> accept|reject Review a proposal\n"
                 "  /memory off|delete <id> Deactivate or delete a memory\n"
                 "  /missions          List missions\n"
                 "  /mission new <title>  Create a mission\n"
@@ -176,6 +182,23 @@ def run_tui() -> int:
                 if args and args[0] == "add" and len(args) >= 3:
                     item = memories.add(args[1], " ".join(args[2:]), source_type="user")
                     print(f"Saved {item['memory_type']} memory: {item['id']}")
+                elif args and args[0] == "extract":
+                    target = args[1] if len(args) > 1 else current
+                    items = conversation_memory.extract(target)
+                    print(f"Created {len(items)} pending memory proposal(s). Review with /memory candidates.")
+                    for item in items:
+                        print(f"  {item['id']} [{item['memory_type']}] {item['content']}")
+                elif args and args[0] == "candidates":
+                    target = args[1] if len(args) > 1 else None
+                    for item in conversation_memory.list_candidates(session_id=target):
+                        print(f"{item['id']} [{item['memory_type']}] {item['content']}\n  Evidence: {item['evidence']}")
+                elif len(args) == 3 and args[0] == "candidate":
+                    item = conversation_memory.decide(args[1], args[2])
+                    print(f"Candidate {item['id']}: {item['status']}" +
+                          (f" → memory {item['memory_id']}" if item.get("memory_id") else ""))
+                elif len(args) == 2 and args[0] == "mission":
+                    item = memories.capture_completed_mission(missions, args[1])
+                    print(f"Captured completed mission as episodic memory: {item['id']}")
                 elif args and args[0] == "list":
                     items = memories.list(memory_type=args[1] if len(args) > 1 else None)
                     for item in items:
@@ -190,8 +213,8 @@ def run_tui() -> int:
                     memories.delete(args[1])
                     print(f"Memory {args[1]} deleted.")
                 else:
-                    print("Usage: /memory list [type] | search <text> | add <episodic|semantic|procedural> <text> | off|delete <id>")
-            except (MemoryError, KeyError) as exc:
+                    print("Usage: /memory list [type] | search <text> | add <episodic|semantic|procedural> <text> | mission <id> | extract [session-id] | candidates [session-id] | candidate <id> accept|reject | off|delete <id>")
+            except (MemoryError, ConversationMemoryError, KeyError, ModelError) as exc:
                 print(f"Memory error: {exc}")
         elif command == "/missions":
             for mission in missions.list():

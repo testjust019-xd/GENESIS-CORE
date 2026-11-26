@@ -13,6 +13,7 @@ from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
 from genesis_core.mission_engine import MissionEngine, MissionEngineError
 from genesis_core.memory import MemoryError, MemoryStore
+from genesis_core.conversation_memory import ConversationMemoryEngine, ConversationMemoryError
 from genesis_core.state import StateStore
 from genesis_core.tools import ToolError
 
@@ -23,6 +24,7 @@ agent = AgentRuntime(store=store, tool_executor=tool_executor)
 mission_store = MissionStore(state=store)
 mission_engine = MissionEngine(store, mission_store, agent)
 memory_store = MemoryStore(store)
+conversation_memory = ConversationMemoryEngine(store, memory_store)
 
 
 class SessionInput(BaseModel):
@@ -41,6 +43,10 @@ class MissionInput(BaseModel):
 
 class MissionStatusInput(BaseModel):
     status: str
+
+
+class MemoryCandidateDecisionInput(BaseModel):
+    decision: str
 
 
 class MemoryInput(BaseModel):
@@ -162,6 +168,46 @@ def run_mission_step(mission_id: str) -> dict:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@app.post("/api/memories/from-mission/{mission_id}")
+def capture_mission_memory(mission_id: str) -> dict:
+    try:
+        return {"memory": memory_store.capture_completed_mission(mission_store, mission_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Mission not found") from exc
+    except MemoryError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/sessions/{session_id}/memory-extract")
+def extract_conversation_memories(session_id: str) -> dict:
+    try:
+        return {"candidates": conversation_memory.extract(session_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Conversation not found") from exc
+    except ConversationMemoryError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ModelError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/memory-candidates")
+def list_memory_candidates(session_id: str | None = None, status: str = "pending") -> dict:
+    try:
+        return {"candidates": conversation_memory.list_candidates(session_id, status)}
+    except ConversationMemoryError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/memory-candidates/{candidate_id}")
+def review_memory_candidate(candidate_id: str, payload: MemoryCandidateDecisionInput) -> dict:
+    try:
+        return {"candidate": conversation_memory.decide(candidate_id, payload.decision)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Memory candidate not found") from exc
+    except ConversationMemoryError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @app.get("/api/memories")
 def list_memories(memory_type: str | None = None, status: str = "active") -> dict:
     try:
@@ -263,7 +309,7 @@ button,input{font:inherit}button{cursor:pointer;color:inherit}.app{height:100vh;
 <main class="center"><div class="centerhead"><div><strong id="active-title">New conversation</strong><div class="sub" id="active-sub">Shared GENESIS session</div></div><span class="pill">ENGINE FOUNDATION</span></div>
 <div class="messages" id="messages"><div class="welcome" id="welcome"><div class="orb">✧</div><h1>GENESIS CORE</h1><p>Your workspace for research, reasoning, tools and evolving skills.<br>Create a conversation to begin building your project context.</p></div></div>
 <div class="composer"><div class="inputbox"><input id="message-input" placeholder="Write a message to GENESIS…" autocomplete="off"><button class="send" id="send">Send ↗</button></div><div class="hint">Messages are shared with GENESIS TUI. Connect a supported model runtime to receive AI responses.</div></div></main>
-<aside class="right"><div class="section">SYSTEM OVERVIEW</div><div class="card"><h3>AGENT ENGINE</h3><div class="kv"><span>Status</span><b>Foundation only</b></div><div class="kv"><span>Inference</span><b>Agent runtime active</b></div><div class="kv"><span>Sessions</span><b id="session-count">0</b></div></div><div class="card"><h3>MODEL RUNTIMES</h3><div id="runtimes" class="notice">Loading…</div></div><div class="card"><h3>MISSION CONTROL</h3><div id="missions" class="notice">Loading missions…</div><div class="mission-create"><input id="mission-title" placeholder="New mission title"><button id="create-mission">＋</button></div></div><div class="card"><h3>LONG-TERM MEMORY</h3><select id="memory-type"><option value="semantic">Semantic fact</option><option value="episodic">Episode</option><option value="procedural">Procedure</option></select><input id="memory-content" placeholder="Add a verified memory"><input id="memory-source" placeholder="Source / reference (optional)"><button id="save-memory" class="primary">Save memory</button><div id="memories" class="notice">Loading memories…</div></div><div class="card"><h3>DESIGN PRINCIPLE</h3><p class="notice">Ollama, llama.cpp, LM Studio and remote APIs are interchangeable backends. GENESIS owns the interface, memory, tools, permissions and agent workflow.</p></div></aside>
+<aside class="right"><div class="section">SYSTEM OVERVIEW</div><div class="card"><h3>AGENT ENGINE</h3><div class="kv"><span>Status</span><b>Foundation only</b></div><div class="kv"><span>Inference</span><b>Agent runtime active</b></div><div class="kv"><span>Sessions</span><b id="session-count">0</b></div></div><div class="card"><h3>MODEL RUNTIMES</h3><div id="runtimes" class="notice">Loading…</div></div><div class="card"><h3>MISSION CONTROL</h3><div id="missions" class="notice">Loading missions…</div><div class="mission-create"><input id="mission-title" placeholder="New mission title"><button id="create-mission">＋</button></div></div><div class="card"><h3>CONVERSATION MEMORY REVIEW</h3><p class="notice">Extract suggestions from user messages in the open conversation. Nothing is saved until you accept it.</p><button id="extract-memories" class="primary">Analyze open conversation</button><div id="memory-candidates" class="notice">No proposals loaded.</div></div><div class="card"><h3>LONG-TERM MEMORY</h3><select id="memory-type"><option value="semantic">Semantic fact</option><option value="episodic">Episode</option><option value="procedural">Procedure</option></select><input id="memory-content" placeholder="Add a verified memory"><input id="memory-source" placeholder="Source / reference (optional)"><button id="save-memory" class="primary">Save memory</button><div id="memories" class="notice">Loading memories…</div></div><div class="card"><h3>DESIGN PRINCIPLE</h3><p class="notice">Ollama, llama.cpp, LM Studio and remote APIs are interchangeable backends. GENESIS owns the interface, memory, tools, permissions and agent workflow.</p></div></aside>
 </div>
 <script>
 let activeId=null;
@@ -274,11 +320,14 @@ async function loadSessions(){const data=await api('/api/sessions');$('sessions'
 async function openSession(id){activeId=id;const data=await api('/api/sessions/'+id+'/messages');$('messages').replaceChildren();for(const m of data.messages)addMessage(m);if(!data.messages.length){const p=document.createElement('p');p.className='notice';p.textContent='This conversation is ready. Send a message to save it.';$('messages').append(p)}const list=await api('/api/sessions');const s=list.sessions.find(x=>x.id===id);$('active-title').textContent=s?.title||'Conversation';$('active-sub').textContent='Session '+id+' · shared with GENESIS TUI';await loadSessions()}
 async function newSession(){const data=await api('/api/sessions',{method:'POST',body:JSON.stringify({title:'New conversation'})});await openSession(data.session.id)}
 async function sendMessage(){const input=$('message-input');const content=input.value.trim();if(!content)return;if(!activeId)await newSession();input.value='';const data=await api('/api/sessions/'+activeId+'/messages',{method:'POST',body:JSON.stringify({content})});const welcome=$('welcome');if(welcome)welcome.remove();addMessage(data.message);if(data.assistant_message){addMessage(data.assistant_message);const note=document.createElement('div');note.className='hint';note.textContent='Answered by '+data.provider+' · '+data.model;$('messages').append(note)}$('messages').scrollTop=$('messages').scrollHeight;await loadSessions();const s=(await api('/api/sessions')).sessions.find(x=>x.id===activeId);$('active-title').textContent=s?.title||'Conversation'}
+async function extractConversationMemories(){if(!activeId){alert('Open a conversation first.');return}try{const data=await api('/api/sessions/'+activeId+'/memory-extract',{method:'POST'});alert('Created '+data.candidates.length+' pending proposal(s). Review them below.');await loadMemoryCandidates()}catch(e){alert(e.message)}}
+async function reviewMemoryCandidate(id,decision){try{const data=await api('/api/memory-candidates/'+id,{method:'POST',body:JSON.stringify({decision})});alert('Proposal '+data.candidate.status+'.');await loadMemoryCandidates();await loadMemories()}catch(e){alert(e.message)}}
+async function loadMemoryCandidates(){const data=await api('/api/memory-candidates');const box=$('memory-candidates');box.replaceChildren();if(!data.candidates.length){box.textContent='No pending proposals.';return}for(const item of data.candidates){const row=document.createElement('div');row.className='mission-row';const body=document.createElement('div');body.textContent='['+item.memory_type+'] '+item.content+'\\nEvidence: “'+item.evidence+'”';const actions=document.createElement('div');actions.className='mission-actions';const accept=document.createElement('button');accept.textContent='Accept';accept.onclick=()=>reviewMemoryCandidate(item.id,'accept');const reject=document.createElement('button');reject.textContent='Reject';reject.onclick=()=>reviewMemoryCandidate(item.id,'reject');actions.append(accept,reject);row.append(body,actions);box.append(row)}}
 async function loadMemories(){const data=await api('/api/memories');$('memories').replaceChildren();if(!data.memories.length){$('memories').textContent='No saved memories.';return}for(const m of data.memories){const row=document.createElement('div');row.className='mission-row';const body=document.createElement('div');body.textContent='['+m.memory_type+'] '+m.content+' · '+m.source_type+' · confidence '+m.confidence;const actions=document.createElement('div');actions.className='mission-actions';const off=document.createElement('button');off.textContent='Deactivate';off.onclick=async()=>{await api('/api/memories/'+m.id,{method:'PATCH',body:JSON.stringify({status:'inactive'})});await loadMemories()};const del=document.createElement('button');del.textContent='Delete';del.onclick=async()=>{if(confirm('Delete this memory permanently?')){await api('/api/memories/'+m.id,{method:'DELETE'});await loadMemories()}};actions.append(off,del);row.append(body,actions);$('memories').append(row)}}
 async function saveMemory(){const content=$('memory-content').value.trim();if(!content)return;await api('/api/memories',{method:'POST',body:JSON.stringify({memory_type:$('memory-type').value,content,source_type:'user',source_ref:$('memory-source').value,confidence:0.8})});$('memory-content').value='';$('memory-source').value='';await loadMemories()}
-async function loadMissions(){const data=await api('/api/missions');$('missions').replaceChildren();if(!data.missions.length){$('missions').textContent='No missions yet.';return}for(const m of data.missions){const row=document.createElement('div');row.className='mission-row';const title=document.createElement('strong');title.textContent=m.title;const meta=document.createElement('span');meta.textContent=m.status+' · priority '+m.priority;const actions=document.createElement('div');actions.className='mission-actions';const run=document.createElement('button');run.className='primary';run.textContent='Run next step';run.onclick=async()=>{try{const result=await api('/api/missions/'+m.id+'/run',{method:'POST'});const detail=result.task?('Step '+result.task.position+': '+result.task.status+' — '+result.task.title):'Mission '+result.mission.status;alert(detail+(result.task&&result.task.result?'\\n\\n'+result.task.result:''));await loadMissions()}catch(e){alert(e.message)}};const tasks=document.createElement('button');tasks.textContent='View tasks';tasks.onclick=async()=>{try{const result=await api('/api/missions/'+m.id+'/tasks');alert(result.tasks.length?result.tasks.map(t=>t.position+'. ['+t.status+'] '+t.title+(t.result?'\\n'+t.result:'' )).join('\\n\\n'):'No plan yet. Press Run next step to generate one.')}catch(e){alert(e.message)}};actions.append(run,tasks);row.append(title,meta,actions);$('missions').append(row)}}
+async function loadMissions(){const data=await api('/api/missions');$('missions').replaceChildren();if(!data.missions.length){$('missions').textContent='No missions yet.';return}for(const m of data.missions){const row=document.createElement('div');row.className='mission-row';const title=document.createElement('strong');title.textContent=m.title;const meta=document.createElement('span');meta.textContent=m.status+' · priority '+m.priority;const actions=document.createElement('div');actions.className='mission-actions';const run=document.createElement('button');run.className='primary';run.textContent='Run next step';run.onclick=async()=>{try{const result=await api('/api/missions/'+m.id+'/run',{method:'POST'});const detail=result.task?('Step '+result.task.position+': '+result.task.status+' — '+result.task.title):'Mission '+result.mission.status;alert(detail+(result.task&&result.task.result?'\\n\\n'+result.task.result:''));await loadMissions()}catch(e){alert(e.message)}};const tasks=document.createElement('button');tasks.textContent='View tasks';tasks.onclick=async()=>{try{const result=await api('/api/missions/'+m.id+'/tasks');alert(result.tasks.length?result.tasks.map(t=>t.position+'. ['+t.status+'] '+t.title+(t.result?'\\n'+t.result:'' )).join('\\n\\n'):'No plan yet. Press Run next step to generate one.')}catch(e){alert(e.message)}};actions.append(run,tasks);if(m.status==='completed'){const remember=document.createElement('button');remember.textContent='Save episode';remember.onclick=async()=>{try{const result=await api('/api/memories/from-mission/'+m.id,{method:'POST'});alert('Saved episodic memory '+result.memory.id);await loadMemories()}catch(e){alert(e.message)}};actions.append(remember)}row.append(title,meta,actions);$('missions').append(row)}}
 async function createMission(){const input=$('mission-title');const title=input.value.trim();if(!title)return;await api('/api/missions',{method:'POST',body:JSON.stringify({title,priority:3})});input.value='';await loadMissions()}
 async function loadStatus(){const s=await api('/api/status');$('version').textContent=s.version;const online=s.model_runtimes.filter(x=>x.available).length;$('model-count').textContent=online+' runtime(s) online';$('runtimes').replaceChildren();for(const r of s.model_runtimes){const row=document.createElement('div');row.className='kv';const name=document.createElement('span');name.textContent=r.provider.replace('_',' ');const state=document.createElement('b');state.innerHTML='<span class="dot '+(r.available?'ok':'')+'"></span>'+ (r.available?'Online':'Offline');row.append(name,state);$('runtimes').append(row)}}
-$('new-session').onclick=()=>newSession();$('send').onclick=()=>sendMessage().catch(e=>alert(e.message));$('message-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendMessage().catch(x=>alert(x.message))});$('refresh').onclick=()=>Promise.all([loadStatus(),loadMissions()]).catch(e=>alert(e.message));$('create-mission').onclick=()=>createMission().catch(e=>alert(e.message));$('save-memory').onclick=()=>saveMemory().catch(e=>alert(e.message));$('mission-title').addEventListener('keydown',e=>{if(e.key==='Enter')createMission().catch(x=>alert(x.message))});
-Promise.all([loadSessions(),loadStatus(),loadMissions(),loadMemories()]).then(()=>{}).catch(e=>console.error(e));
+$('new-session').onclick=()=>newSession();$('send').onclick=()=>sendMessage().catch(e=>alert(e.message));$('message-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendMessage().catch(x=>alert(x.message))});$('refresh').onclick=()=>Promise.all([loadStatus(),loadMissions()]).catch(e=>alert(e.message));$('create-mission').onclick=()=>createMission().catch(e=>alert(e.message));$('save-memory').onclick=()=>saveMemory().catch(e=>alert(e.message));$('extract-memories').onclick=()=>extractConversationMemories();$('mission-title').addEventListener('keydown',e=>{if(e.key==='Enter')createMission().catch(x=>alert(x.message))});
+Promise.all([loadSessions(),loadStatus(),loadMissions(),loadMemories(),loadMemoryCandidates()]).then(()=>{}).catch(e=>console.error(e));
 </script></body></html>"""
