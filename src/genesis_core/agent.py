@@ -232,7 +232,11 @@ class AgentRuntime:
             else:
                 raw_answer = adapter.chat(messages)
                 if on_token:
-                    on_token(raw_answer)
+                    fallback_action = _decode_action(raw_answer) if catalogue else None
+                    if fallback_action and fallback_action.get("action") == "final":
+                        on_token(str(fallback_action.get("message", "")))
+                    elif not catalogue or fallback_action is None:
+                        on_token(raw_answer)
             action = _decode_action(raw_answer) if catalogue else None
             if action is None or action.get("action") == "final":
                 answer = str(action.get("message", "") if action else raw_answer).strip()
