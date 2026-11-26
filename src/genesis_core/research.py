@@ -415,11 +415,14 @@ class ResearchEngine:
 
     @staticmethod
     def configured_provider(name: str | None = None) -> SearchProvider | None:
-        selected = (name or os.environ.get("GENESIS_SEARCH_PROVIDER", "")).strip().lower()
+        from genesis_core.config import get_search_settings
+
+        saved = get_search_settings()
+        selected = (name or os.environ.get("GENESIS_SEARCH_PROVIDER") or saved["provider"]).strip().lower()
         if selected in {"", "offline", "local", "none"}:
             return None
         if selected == "searxng":
-            return SearXNGProvider()
+            return SearXNGProvider(os.environ.get("GENESIS_SEARXNG_URL") or saved["searxng_url"] or None)
         if selected == "brave":
             return BraveSearchProvider()
         raise ResearchError("Unknown search provider. Choose searxng, brave or offline.")
