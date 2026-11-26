@@ -64,3 +64,22 @@ def test_pull_ollama_model_streams_progress(monkeypatch):
     assert captured["url"].endswith("/api/pull")
     assert captured["payload"]["name"] == "gemma3:1b"
     assert len(events) == 2
+
+
+def test_setup_offers_single_detected_model_as_primary(monkeypatch, tmp_path):
+    import io
+    from genesis_core.models import RuntimeStatus
+    from genesis_core.onboarding import run_setup
+    from genesis_core.config import read_settings
+
+    monkeypatch.setenv("GENESIS_HOME", str(tmp_path / "genesis"))
+    monkeypatch.setattr("genesis_core.onboarding.inspect_hardware", lambda: {
+        "memory_total_bytes": 8 * GIB, "memory_available_bytes": 5 * GIB,
+        "cpu_logical": 4, "disk_free_bytes": 20 * GIB,
+    })
+    monkeypatch.setattr("genesis_core.onboarding.discover_runtimes", lambda: [
+        RuntimeStatus("ollama", "http://127.0.0.1:11434", True, ["qwen:1.5b"], "1 model")
+    ])
+    result = run_setup(input_fn=lambda _prompt: "", output=io.StringIO())
+    assert result == 0
+    assert read_settings()["model"]["name"] == "qwen:1.5b"
