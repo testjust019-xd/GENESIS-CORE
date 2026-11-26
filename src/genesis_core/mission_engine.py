@@ -169,7 +169,7 @@ class MissionEngine:
             except ModelError as exc:
                 observation = {"status": "blocked", "summary": f"Observer unavailable; review required: {exc}"}
         task_status = observation["status"]
-        stored_result = output + "\\n\\nObserver: " + observation["summary"]
+        stored_result = output + "\n\nObserver: " + observation["summary"]
         self.missions.set_task_status(task["id"], task_status, result=stored_result)
         updated_tasks = self.missions.list_tasks(mission_id)
         if task_status == "blocked":
