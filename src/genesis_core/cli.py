@@ -161,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  • {model}")
         return 0
     if args.command in {"studio", "serve"}:
+        run_first_start_if_needed()
         try:
             import uvicorn
         except ImportError:
