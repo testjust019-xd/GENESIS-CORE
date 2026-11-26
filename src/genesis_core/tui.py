@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shlex
+from genesis_core.agent import AgentRuntime, ModelError
 from genesis_core.models import discover_runtimes
 from genesis_core.state import StateStore
 
@@ -18,6 +19,7 @@ BANNER = r"""
 
 def run_tui() -> int:
     store = StateStore()
+    agent = AgentRuntime(store=store)
     current = None
     sessions = store.list_sessions(limit=1)
     if sessions:
@@ -28,7 +30,7 @@ def run_tui() -> int:
     print(BANNER)
     print("GENESIS CORE · TERMINAL WORKSPACE")
     print("Shared local sessions · type /help for commands · /quit to exit")
-    print("Note: model inference is not connected yet; messages are saved, not answered by an AI.")
+    print("GENESIS agent runtime enabled · connect a supported model runtime to chat.")
     print()
 
     while True:
@@ -44,8 +46,14 @@ def run_tui() -> int:
         if not raw.startswith("/"):
             if not current:
                 current = store.create_session()["id"]
-            store.add_message(current, "user", raw)
-            print("  Saved to this conversation. The agent runtime is not connected yet.")
+            try:
+                reply = agent.chat(current, raw)
+                print(f"\nGENESIS [{reply.provider}/{reply.model}]")
+                print(reply.assistant_message["content"])
+                print()
+            except ModelError as exc:
+                print(f"\nModel unavailable: {exc}")
+                print("Start a local model runtime or configure GENESIS_MODEL_PROVIDER / GENESIS_MODEL.\n")
             continue
 
         try:
