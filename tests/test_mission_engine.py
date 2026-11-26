@@ -310,3 +310,28 @@ def test_adaptive_replanning_uses_analyst_and_planner_specialists(tmp_path):
     assert result["specialist_run_id"]
     assert len(adapter.calls) == 2
     assert "public alternative" in adapter.calls[1][1]["content"]
+
+
+def test_mission_execution_uses_task_specialist_and_keeps_runtime_permissions(tmp_path):
+    from genesis_core.multi_agent import MultiAgentEngine
+
+    state = StateStore(tmp_path / "genesis.db")
+    missions = MissionStore(state)
+    mission = missions.create("Research a topic", "Collect and summarize reliable sources.")
+    session = state.create_session("Mission: Research a topic")
+    task = missions.save_plan(mission["id"], session["id"], [
+        {"title": "Research available sources", "instructions": "Gather relevant sources and summarize evidence."}
+    ])[0]
+    adapter = ScriptedAdapter([
+        "I gathered the available source material and summarized its evidence and gaps.",
+        json.dumps({"status": "completed", "summary": "The source summary is present and limitations are stated."}),
+    ])
+    agent = AgentRuntime(store=state, adapter=adapter)
+    engine = MissionEngine(state, missions, agent, multi_agent=MultiAgentEngine(state, adapter=adapter))
+
+    result = engine.run_next(mission["id"])
+
+    assert result["specialist"] == "researcher"
+    assert "SPECIALIST ROLE: Researcher" in adapter.calls[0][-1]["content"]
+    assert result["task"]["status"] == "completed"
+    assert result["task"]["result"].startswith("[Specialist: researcher]")

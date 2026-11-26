@@ -67,3 +67,17 @@ def test_model_failure_marks_run_failed(tmp_path):
     with pytest.raises(ModelError):
         engine.collaborate("Test outage", roles=["analyst"])
     assert engine.list_runs()[0]["status"] == "failed"
+
+
+@pytest.mark.parametrize("title,instructions,expected", [
+    ("Research options", "Gather useful source material", "researcher"),
+    ("Compare approaches", "Analyze constraints and trade-offs", "analyst"),
+    ("Design architecture", "Create a practical outline", "planner"),
+    ("Verify output", "Review and validate the result", "reviewer"),
+    ("Implement feature", "Carry out the requested work", "executor"),
+])
+def test_task_specialist_routing_is_deterministic(title, instructions, expected):
+    selected = MultiAgentEngine.specialist_for_task(title, instructions)
+    assert selected["id"] == expected
+    assert selected["label"]
+    assert selected["instruction"]

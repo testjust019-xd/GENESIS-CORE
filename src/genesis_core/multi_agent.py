@@ -49,6 +49,14 @@ ROLE_CATALOG: dict[str, dict[str, str]] = {
             "unverified claims and safer or simpler alternatives. Do not merely agree."
         ),
     },
+    "executor": {
+        "label": "Executor",
+        "instruction": (
+            "Carry out the assigned task using only the tools and permissions available "
+            "through the GENESIS runtime. Report concrete evidence, limitations and any "
+            "work that remains; never claim an action that did not happen."
+        ),
+    },
 }
 
 
@@ -90,6 +98,21 @@ class MultiAgentEngine:
     @staticmethod
     def roles() -> list[dict[str, str]]:
         return [{"id": key, "label": value["label"]} for key, value in ROLE_CATALOG.items()]
+
+    @staticmethod
+    def specialist_for_task(title: str, instructions: str) -> dict[str, str]:
+        """Choose a role deterministically without spending another model call."""
+        text = f"{title} {instructions}".casefold()
+        signals = (
+            ("researcher", ("research", "search", "source", "collect", "gather", "find")),
+            ("analyst", ("analy", "compare", "diagnos", "evaluate", "investigate")),
+            ("planner", ("plan", "design", "architect", "outline", "structure")),
+            ("reviewer", ("review", "verify", "audit", "check", "test", "validate")),
+        )
+        for role, keywords in signals:
+            if any(keyword in text for keyword in keywords):
+                return {"id": role, **ROLE_CATALOG[role]}
+        return {"id": "executor", **ROLE_CATALOG["executor"]}
 
     def collaborate(self, objective: str, roles: list[str] | None = None) -> dict[str, Any]:
         objective = objective.strip()

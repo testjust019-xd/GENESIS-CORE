@@ -255,8 +255,14 @@ class MissionEngine:
         if mission["status"] in {"planned", "blocked"}:
             self.missions.set_status(mission_id, "running")
         self.missions.set_task_status(task["id"], "running")
+        specialist = self.multi_agent.specialist_for_task(task["title"], task["instructions"]) if self.multi_agent else None
+        specialist_context = (
+            f"SPECIALIST ROLE: {specialist['label']}\nROLE FOCUS: {specialist['instruction']}\n"
+            if specialist else ""
+        )
         task_prompt = (
-            f"MISSION OBJECTIVE: {mission['description'] or mission['title']}\n"
+            specialist_context
+            + f"MISSION OBJECTIVE: {mission['description'] or mission['title']}\n"
             f"CURRENT STEP {task['position']}: {task['title']}\n"
             f"INSTRUCTIONS: {task['instructions']}\n"
             + ("This task was interrupted during a previous run. Inspect the conversation history and avoid repeating work already confirmed.\n" if was_interrupted else "")
@@ -283,7 +289,7 @@ class MissionEngine:
             except ModelError as exc:
                 observation = {"status": "blocked", "summary": f"Observer unavailable; review required: {exc}"}
         task_status = observation["status"]
-        stored_result = output + "\n\nObserver: " + observation["summary"]
+        stored_result = (f"[Specialist: {specialist['id']}]\n" if specialist else "") + output + "\n\nObserver: " + observation["summary"]
         self.missions.set_task_status(task["id"], task_status, result=stored_result)
         updated_tasks = self.missions.list_tasks(mission_id)
         if task_status == "blocked":
@@ -300,6 +306,7 @@ class MissionEngine:
             "observation": observation,
             "provider": reply.provider,
             "model": reply.model,
+            "specialist": specialist["id"] if specialist else None,
         }
 
 
