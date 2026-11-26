@@ -127,3 +127,39 @@ def test_agent_stops_repeated_tool_calls(tmp_path):
 
     assert reply.activity[-1]["type"] == "loop_guard"
     assert "repeated tool request" in reply.assistant_message["content"]
+
+def test_agent_resumes_exact_approved_tool_request_once(tmp_path):
+    store = StateStore(tmp_path / "genesis.db")
+    session = store.create_session()
+    executions = []
+    registry = ToolRegistry()
+    registry.register(ToolSpec(
+        "write_note", "Write a note",
+        {"type": "object", "properties": {"text": {"type": "string"}},
+         "required": ["text"], "additionalProperties": False},
+        lambda args: executions.append(args["text"]) or {"saved": args["text"]},
+        capabilities=frozenset({"workspace_write"}), risk="write",
+    ))
+    approvals = ApprovalStore(store.database_path)
+    executor = ToolExecutor(
+        registry, PermissionManager({"approval_capabilities": ["workspace_write"]}), approvals
+    )
+    tool_request = json.dumps({
+        "action": "tool", "tool": "write_note", "arguments": {"text": "approved note"}
+    })
+    adapter = ScriptedAdapter([
+        tool_request,
+        tool_request,
+        json.dumps({"action": "final", "message": "The note was saved."}),
+    ])
+    runtime = AgentRuntime(store=store, adapter=adapter, tool_executor=executor)
+
+    first = runtime.chat(session["id"], "Save a note")
+    approval_id = first.activity[0]["approval_id"]
+    approvals.decide(approval_id, approved=True)
+    second = runtime.chat(session["id"], "Continue with the approved action")
+
+    assert executions == ["approved note"]
+    assert approvals.get(approval_id)["status"] == "used"
+    assert second.assistant_message["content"] == "The note was saved."
+    assert second.activity[0]["status"] == "completed"
