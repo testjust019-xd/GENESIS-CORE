@@ -8,7 +8,7 @@ GENESIS CORE is its own agent environment. Local runtimes such as Ollama, llama.
 
 ## Project status
 
-**Early foundation / v0.1.0-dev.** The repository includes two first-party interfaces (**GENESIS TUI** and **GENESIS Studio**), a shared SQLite conversation store, local runtime discovery, initial chat adapters for Ollama and OpenAI-compatible local servers, and a first agent loop. The agent can now send conversation context to a selected local model and persist its reply. Tool execution, planning, long-term memory, research, and training remain future milestones. Automated tests and CI have been added, and the initial test run passed.
+**Early foundation / v0.1.0-dev.** The repository includes two first-party interfaces (**GENESIS TUI** and **GENESIS Studio**), a shared SQLite conversation store, local runtime discovery, initial chat adapters for Ollama and OpenAI-compatible local servers, and a first agent loop. The agent can now send conversation context to a selected local model and persist its reply. A persistent mission queue is also available in the TUI and Studio. Multi-step planning, tool execution, long-term memory, research, and training remain future milestones. Automated tests and CI have been added, and the initial test run passed.
 
 ## Principles
 
@@ -78,7 +78,7 @@ See [docs/INTERFACES.md](docs/INTERFACES.md) for the TUI/Studio contract and [do
 | Hardware Monitor | CPU, RAM, disk and platform detection | Initial |
 | Model Discovery | Detect local runtimes and models | Initial |
 | Model Adapters | Ollama and OpenAI-compatible local chat adapters | Initial |
-| Agent Runtime | Context-aware direct chat loop; planner and tools pending | Initial |
+| Agent Runtime | Context-aware direct chat loop; planner and tools pending | Initial |\n| Mission Control | Persistent goals, priorities and status transitions | Initial |
 | Memory | Episodic and semantic knowledge | Planned |
 | Research Engine | Search, source capture and verification | Planned |
 | Tool System | Permissioned tools and extensions | Planned |
