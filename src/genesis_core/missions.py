@@ -20,6 +20,7 @@ TRANSITIONS = {
     "completed": set(),
     "cancelled": set(),
 }
+TASK_STATUSES = {"planned", "running", "blocked", "completed", "failed"}
 
 
 class MissionError(ValueError):
@@ -27,7 +28,7 @@ class MissionError(ValueError):
 
 
 class MissionStore:
-    """SQLite mission queue sharing the same database as conversations."""
+    """SQLite mission queue and durable task plans sharing conversation storage."""
 
     def __init__(self, state: StateStore | None = None) -> None:
         self.database_path: Path = (state or StateStore()).database_path
@@ -48,8 +49,7 @@ class MissionStore:
 
     def _initialise(self) -> None:
         with self._connect() as db:
-            db.execute(
-                """
+            db.execute("""
                 CREATE TABLE IF NOT EXISTS missions (
                     id TEXT PRIMARY KEY,
                     title TEXT NOT NULL,
@@ -57,22 +57,41 @@ class MissionStore:
                     status TEXT NOT NULL,
                     priority INTEGER NOT NULL DEFAULT 3,
                     created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    session_id TEXT
                 )
-                """
-            )
+            """)
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(missions)")}
+            if "session_id" not in columns:
+                db.execute("ALTER TABLE missions ADD COLUMN session_id TEXT")
             db.execute(
                 "CREATE INDEX IF NOT EXISTS idx_missions_status_updated "
                 "ON missions(status, updated_at)"
+            )
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS mission_tasks (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+                    position INTEGER NOT NULL,
+                    title TEXT NOT NULL,
+                    instructions TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    result TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(mission_id, position)
+                )
+            """)
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_mission_tasks_status "
+                "ON mission_tasks(mission_id, status, position)"
             )
 
     @staticmethod
     def _now() -> str:
         return datetime.now(timezone.utc).isoformat()
 
-    def create(
-        self, title: str, description: str = "", priority: int = 3
-    ) -> dict[str, Any]:
+    def create(self, title: str, description: str = "", priority: int = 3) -> dict[str, Any]:
         title = title.strip()
         if not title:
             raise MissionError("Mission title cannot be empty.")
@@ -80,17 +99,14 @@ class MissionStore:
             raise MissionError("Priority must be between 1 (highest) and 5 (lowest).")
         now = self._now()
         item = {
-            "id": uuid.uuid4().hex[:12],
-            "title": title[:160],
-            "description": description.strip()[:10000],
-            "status": "planned",
-            "priority": priority,
-            "created_at": now,
-            "updated_at": now,
+            "id": uuid.uuid4().hex[:12], "title": title[:160],
+            "description": description.strip()[:10000], "status": "planned",
+            "priority": priority, "created_at": now, "updated_at": now,
+            "session_id": None,
         }
         with self._connect() as db:
             db.execute(
-                "INSERT INTO missions VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO missions VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 tuple(item.values()),
             )
         return item
@@ -108,7 +124,7 @@ class MissionStore:
             else:
                 rows = db.execute(
                     "SELECT * FROM missions ORDER BY priority ASC, updated_at DESC LIMIT ?",
-                    (max(1, min(limit, 500)),),
+                    (max(1, min(limit, 500))),
                 ).fetchall()
         return [dict(row) for row in rows]
 
@@ -126,9 +142,7 @@ class MissionStore:
         if status == current["status"]:
             return current
         if status not in TRANSITIONS[current["status"]]:
-            raise MissionError(
-                f"Cannot change mission from {current['status']} to {status}."
-            )
+            raise MissionError(f"Cannot change mission from {current['status']} to {status}.")
         now = self._now()
         with self._connect() as db:
             db.execute(
@@ -137,5 +151,68 @@ class MissionStore:
             )
         return self.get(mission_id) or current
 
+    def save_plan(
+        self, mission_id: str, session_id: str, tasks: list[dict[str, str]]
+    ) -> list[dict[str, Any]]:
+        if not tasks or len(tasks) > 8:
+            raise MissionError("A mission plan must contain between 1 and 8 tasks.")
+        now = self._now()
+        with self._connect() as db:
+            if not db.execute("SELECT 1 FROM missions WHERE id = ?", (mission_id,)).fetchone():
+                raise KeyError(mission_id)
+            count = db.execute(
+                "SELECT COUNT(*) FROM mission_tasks WHERE mission_id = ?", (mission_id,)
+            ).fetchone()[0]
+            if count:
+                raise MissionError("A plan already exists for this mission.")
+            db.execute(
+                "UPDATE missions SET session_id = ?, updated_at = ? WHERE id = ?",
+                (session_id, now, mission_id),
+            )
+            for position, task in enumerate(tasks, start=1):
+                db.execute(
+                    "INSERT INTO mission_tasks "
+                    "(id, mission_id, position, title, instructions, status, result, created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, 'planned', '', ?, ?)",
+                    (uuid.uuid4().hex[:12], mission_id, position,
+                     task["title"], task["instructions"], now, now),
+                )
+        return self.list_tasks(mission_id)
 
-__all__ = ["MissionError", "MissionStore", "STATUSES"]
+    def list_tasks(self, mission_id: str) -> list[dict[str, Any]]:
+        with self._connect() as db:
+            rows = db.execute(
+                "SELECT * FROM mission_tasks WHERE mission_id = ? ORDER BY position",
+                (mission_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_task(self, task_id: str) -> dict[str, Any] | None:
+        with self._connect() as db:
+            row = db.execute("SELECT * FROM mission_tasks WHERE id = ?", (task_id,)).fetchone()
+        return dict(row) if row else None
+
+    def set_task_status(
+        self, task_id: str, status: str, result: str | None = None
+    ) -> dict[str, Any]:
+        if status not in TASK_STATUSES:
+            raise MissionError(f"Unknown task status: {status}")
+        current = self.get_task(task_id)
+        if current is None:
+            raise KeyError(task_id)
+        now = self._now()
+        with self._connect() as db:
+            if result is None:
+                db.execute(
+                    "UPDATE mission_tasks SET status = ?, updated_at = ? WHERE id = ?",
+                    (status, now, task_id),
+                )
+            else:
+                db.execute(
+                    "UPDATE mission_tasks SET status = ?, result = ?, updated_at = ? WHERE id = ?",
+                    (status, result[:20000], now, task_id),
+                )
+        return self.get_task(task_id) or current
+
+
+__all__ = ["MissionError", "MissionStore", "STATUSES", "TASK_STATUSES"]
