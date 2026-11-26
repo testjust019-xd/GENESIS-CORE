@@ -16,6 +16,7 @@ from genesis_core.conversation_memory import ConversationMemoryEngine, Conversat
 from genesis_core.knowledge import KnowledgeError, KnowledgeStore
 from genesis_core.research import ResearchEngine, ResearchError
 from genesis_core.research_intelligence import ResearchIntelligence, ResearchIntelligenceError
+from genesis_core.learning import LearningEngine, LearningError
 from genesis_core.skills import SkillError, SkillStore
 from genesis_core.state import StateStore
 from genesis_core.tools import ApprovalStore, PermissionManager, ToolExecutor, build_core_registry
@@ -45,6 +46,7 @@ def run_tui() -> int:
     knowledge = KnowledgeStore(store)
     research = ResearchEngine(store, knowledge)
     research_intelligence = ResearchIntelligence(store)
+    learning = LearningEngine(store)
     skills = SkillStore(store.database_path, {item['name'] for item in tool_registry.list()})
     current = None
     sessions = store.list_sessions(limit=1)
@@ -124,6 +126,8 @@ def run_tui() -> int:
                 "  /research review <id> approve|reject Review a source\n"
                 "  /research report <run-id> [focus] Generate a cited synthesis from approved sources\n"
                 "  /research reports [run-id] List saved research reports\n"
+                "  /learn create <goal> Create a learning curriculum\n"
+                "  /learn list | show <course-id> | answer <lesson-id> <text> | attempts <lesson-id>\n"
                 "  /missions          List missions\n"
                 "  /mission new <title>  Create a mission\n"
                 "  /mission status <id> <status>  Update mission status\n"
@@ -317,6 +321,42 @@ def run_tui() -> int:
                     print("Usage: /research search <query> | sources [pending|approved|rejected] | review <id> approve|reject | report <run-id> [focus] | reports [run-id]")
             except (ResearchError, ResearchIntelligenceError, KeyError, ModelError) as exc:
                 print(f"Research error: {exc}")
+        elif command == "/learn":
+            try:
+                if len(args) >= 2 and args[0] == "create":
+                    course = learning.create_course(" ".join(args[1:]))
+                    print(f"Learning course {course['id']}: {course['title']}")
+                    print(f"Goal: {course['goal']}")
+                    for lesson in course["lessons"]:
+                        print(f"  {lesson['position']}. {lesson['id']} — {lesson['title']}")
+                        print(f"     {lesson['prompt']}")
+                elif len(args) == 1 and args[0] == "list":
+                    for course in learning.list_courses():
+                        print(f"{course['id']} · {course['title']} · {course['completed_lessons']} lessons completed · {course['xp']} XP")
+                elif len(args) == 2 and args[0] == "show":
+                    course = learning.get_course(args[1])
+                    print(f"{course['title']} · {course['progress_percent']}% · {course['xp']} XP")
+                    for lesson in course["lessons"]:
+                        state = "completed" if lesson["completed"] else "open"
+                        print(f"  {lesson['position']}. [{state}] {lesson['id']} — {lesson['title']} (best {lesson['best_score']}%)")
+                        print(f"     {lesson['prompt']}")
+                        if lesson["hints"]:
+                            print("     Hints: " + " | ".join(lesson["hints"]))
+                elif len(args) >= 3 and args[0] == "answer":
+                    result = learning.submit_answer(args[1], " ".join(args[2:]))
+                    print(f"Score: {result['score']}% · best: {result['best_score']}% · +{result['xp_awarded']} XP")
+                    if result["matched_concepts"]:
+                        print("Matched: " + ", ".join(result["matched_concepts"]))
+                    if result["missing_concepts"]:
+                        print("Still to cover: " + ", ".join(result["missing_concepts"]))
+                    print(result["evaluation_note"])
+                elif len(args) == 2 and args[0] == "attempts":
+                    for attempt in learning.attempts(args[1]):
+                        print(f"{attempt['created_at']} · {attempt['score']}% · +{attempt['xp_awarded']} XP")
+                else:
+                    print("Usage: /learn create <goal> | list | show <course-id> | answer <lesson-id> <text> | attempts <lesson-id>")
+            except (LearningError, KeyError, ModelError) as exc:
+                print(f"Learning error: {exc}")
         elif command == "/knowledge":
             try:
                 if len(args) >= 2 and args[0] == "add":
