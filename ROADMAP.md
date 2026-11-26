@@ -52,10 +52,11 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Explicit capture of fully completed missions into episodic memory using persisted observer-checked outcomes (initial)
 - [x] User-triggered conversation memory proposals with exact user-message evidence and explicit review (initial)
 - [ ] Verified conversation/session summarisation into episodic memory
-- [ ] User-directed learning missions
-- [ ] Gap analysis and curriculum generation
-- [ ] Practice tasks and skill assessments
-- [ ] XP as a progress indicator, not a proxy for intelligence
+- [x] Initial user-directed learning curricula and persistent practice attempts
+- [x] Initial curriculum generation from user learning goals
+- [ ] Gap analysis and adaptive curriculum generation
+- [x] Initial practice tasks with transparent deterministic concept-coverage assessment
+- [x] XP as a non-farmable progress indicator, not a proxy for intelligence
 
 ## Knowledge Engine — Initial local knowledge base
 - [x] Import UTF-8 TXT, Markdown and reStructuredText files (initial)
