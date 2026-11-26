@@ -203,7 +203,7 @@ class KnowledgeStore:
                     rows = db.execute(
                         "SELECT c.id, c.document_id, c.chunk_index, c.content, "
                         "d.title, d.source_uri, bm25(knowledge_fts) AS rank "
-                        "FROM knowledge_fts f JOIN knowledge_chunks c ON c.id = f.rowid "
+                        "FROM knowledge_fts JOIN knowledge_chunks c ON c.id = knowledge_fts.rowid "
                         "JOIN knowledge_documents d ON d.id = c.document_id "
                         "WHERE knowledge_fts MATCH ? ORDER BY rank LIMIT ?",
                         (expression, safe_limit),
@@ -211,12 +211,15 @@ class KnowledgeStore:
                 except sqlite3.OperationalError:
                     rows = []
             else:
+                rows = []
+            if not rows:
                 clauses = " OR ".join("c.content LIKE ?" for _ in terms)
                 rows = db.execute(
                     "SELECT c.id, c.document_id, c.chunk_index, c.content, "
                     "d.title, d.source_uri, 0.0 AS rank "
                     "FROM knowledge_chunks c JOIN knowledge_documents d "
-                    "ON d.id = c.document_id WHERE " + clauses + " LIMIT ?",
+                    "ON d.id = c.document_id WHERE " + clauses +
+                    " ORDER BY d.updated_at DESC LIMIT ?",
                     tuple("%" + term + "%" for term in terms) + (safe_limit,),
                 ).fetchall()
         results = []
