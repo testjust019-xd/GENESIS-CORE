@@ -5,6 +5,7 @@ from __future__ import annotations
 import shlex
 from genesis_core.agent import AgentRuntime, ModelError
 from genesis_core.models import discover_runtimes
+from genesis_core.missions import MissionError, MissionStore
 from genesis_core.state import StateStore
 
 
@@ -20,6 +21,7 @@ BANNER = r"""
 def run_tui() -> int:
     store = StateStore()
     agent = AgentRuntime(store=store)
+    missions = MissionStore(state=store)
     current = None
     sessions = store.list_sessions(limit=1)
     if sessions:
@@ -74,6 +76,9 @@ def run_tui() -> int:
                 "  /open <id>         Switch conversation\n"
                 "  /history           Show current conversation\n"
                 "  /models            Inspect local model runtimes\n"
+                "  /missions          List missions\n"
+                "  /mission new <title>  Create a mission\n"
+                "  /mission status <id> <status>  Update mission status\n"
                 "  /help              Show this help\n"
                 "  /quit              Exit\n"
             )
@@ -105,6 +110,24 @@ def run_tui() -> int:
                 print(f"{runtime.provider}: {status} — {runtime.detail}")
                 for model in runtime.models:
                     print(f"  • {model}")
+        elif command == "/missions":
+            for mission in missions.list():
+                print(
+                    f"{mission['id']} [{mission['status']}] "
+                    f"P{mission['priority']} — {mission['title']}"
+                )
+        elif command == "/mission":
+            try:
+                if len(args) >= 2 and args[0] == "new":
+                    mission = missions.create(" ".join(args[1:]))
+                    print(f"Mission created: {mission['id']} — {mission['title']}")
+                elif len(args) == 3 and args[0] == "status":
+                    mission = missions.set_status(args[1], args[2])
+                    print(f"Mission {mission['id']} is now {mission['status']}.")
+                else:
+                    print("Usage: /mission new <title> | /mission status <id> <status>")
+            except (MissionError, KeyError) as exc:
+                print(f"Mission error: {exc}")
         else:
             print(f"Unknown command: {command}. Type /help.")
 
