@@ -26,10 +26,12 @@ This roadmap describes intended work. A feature is complete only when implemente
 ## Milestone 2 — Agent runtime
 - [x] Basic context-aware chat loop (initial)
 - [x] Persistent mission and goal representation (initial CRUD and status transitions)
-- [ ] Planner / executor / observer loop
+- [x] Bounded planner / executor / observer loop over chat adapters (initial)
 - [x] Initial tool registry with JSON-schema subset validation and duplicate protection
 - [x] Initial read-only workspace tools (directory listing and UTF-8 file reading, path-confined)
 - [x] Initial fail-closed permission profiles and persistent approval queue (write/system actions remain gated)
+- [x] Agent tool routing with bounded steps, repeated-call guard and observer review
+- [x] Approval queue exposed through Studio API and TUI
 - [ ] Permission profiles exposed in Studio/TUI and approval management UI
 - [ ] Timeouts, budgets, retries and audit log
 - [ ] Structured activity events shared by TUI and Studio
