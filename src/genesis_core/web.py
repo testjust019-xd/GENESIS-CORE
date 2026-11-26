@@ -17,6 +17,7 @@ from genesis_core.memory import MemoryError, MemoryStore
 from genesis_core.conversation_memory import ConversationMemoryEngine, ConversationMemoryError
 from genesis_core.knowledge import KnowledgeError, KnowledgeStore
 from genesis_core.research import ResearchEngine, ResearchError
+from genesis_core.research_intelligence import ResearchIntelligence, ResearchIntelligenceError
 from genesis_core.skills import SkillError, SkillStore
 from genesis_core.state import StateStore
 from genesis_core.tools import ToolError
@@ -32,6 +33,7 @@ memory_store = MemoryStore(store)
 conversation_memory = ConversationMemoryEngine(store, memory_store)
 knowledge_store = KnowledgeStore(store)
 research_engine = ResearchEngine(store, knowledge_store)
+research_intelligence = ResearchIntelligence(store)
 skill_store = SkillStore(store.database_path, {item['name'] for item in tool_executor.registry.list()})
 
 
@@ -101,6 +103,10 @@ class SkillReviewInput(BaseModel):
 class ResearchReviewInput(BaseModel):
     decision: str
     note: str = Field(default="", max_length=1000)
+
+
+class ResearchReportInput(BaseModel):
+    question: str = Field(default="", max_length=2000)
 
 
 class MemoryInput(BaseModel):
@@ -420,6 +426,31 @@ def search_research(payload: ResearchInput) -> dict:
 @app.get("/api/research/runs")
 def list_research_runs() -> dict:
     return {"runs": research_engine.store.list_runs()}
+
+
+@app.post("/api/research/runs/{run_id}/report")
+def generate_research_report(run_id: str, payload: ResearchReportInput) -> dict:
+    try:
+        return {"report": research_intelligence.generate(run_id, payload.question)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Research run not found") from exc
+    except ResearchIntelligenceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ModelError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/research/reports")
+def list_research_reports(run_id: str | None = None) -> dict:
+    return {"reports": research_intelligence.list(run_id)}
+
+
+@app.get("/api/research/reports/{report_id}")
+def get_research_report(report_id: str) -> dict:
+    try:
+        return {"report": research_intelligence.get(report_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Research report not found") from exc
 
 
 @app.get("/api/research/sources")
