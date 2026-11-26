@@ -8,7 +8,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Local web status endpoint and dashboard
 - [x] Shared SQLite sessions and messages
 - [x] First-party TUI and Studio foundations
-- [x] Automated test workflow added (first CI result pending)
+- [x] Automated test workflow added and passing
 - [ ] Configuration validation and structured logs
 
 ## Milestone 1 — Model connectivity
@@ -17,7 +17,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] llama.cpp OpenAI-compatible chat adapter (initial)
 - [x] LM Studio OpenAI-compatible chat adapter (initial)
 - [x] Persistent primary-model selection for supported local runtimes
-- [ ] Run and pass provider adapter tests in CI
+- [x] Provider adapter and agent-loop tests pass in CI
 - [ ] Hugging Face Transformers local adapter
 - [ ] Optional remote API mentor providers and secure secret storage
 - [ ] Model capability and context-window inspection
