@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import os
 import shlex
+from pathlib import Path
 from genesis_core.agent import AgentRuntime, ModelError
 from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
 from genesis_core.state import StateStore
+from genesis_core.tools import ApprovalStore, PermissionManager, ToolExecutor, build_core_registry
 
 
 BANNER = r"""
@@ -22,6 +25,10 @@ def run_tui() -> int:
     store = StateStore()
     agent = AgentRuntime(store=store)
     missions = MissionStore(state=store)
+    genesis_home = Path(os.environ.get("GENESIS_HOME", Path.home() / ".genesis"))
+    approvals = ApprovalStore(store.database_path)
+    tool_registry = build_core_registry(genesis_home / "workspace")
+    tool_executor = ToolExecutor(tool_registry, PermissionManager(), approvals)
     current = None
     sessions = store.list_sessions(limit=1)
     if sessions:
@@ -110,6 +117,24 @@ def run_tui() -> int:
                 print(f"{runtime.provider}: {status} — {runtime.detail}")
                 for model in runtime.models:
                     print(f"  • {model}")
+        elif command == "/tools":
+            for tool in tool_registry.list():
+                print(f"{tool['name']} [{tool['risk']}] — {tool['description']}")
+        elif command == "/approvals":
+            pending = approvals.list()
+            if not pending:
+                print("No pending tool approvals.")
+            for request in pending:
+                print(f"{request['id']} — {request['tool_name']} — {request['reason']}")
+        elif command == "/approval":
+            if len(args) != 2 or args[1] not in {"approve", "reject"}:
+                print("Usage: /approval <id> approve|reject")
+            else:
+                try:
+                    item = approvals.decide(args[0], approved=args[1] == "approve")
+                    print(f"Approval {item['id']}: {item['status']}.")
+                except Exception as exc:
+                    print(f"Approval error: {exc}")
         elif command == "/missions":
             for mission in missions.list():
                 print(
