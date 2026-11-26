@@ -41,8 +41,10 @@ This roadmap describes intended work. A feature is complete only when implemente
 
 ## Milestone 3 — Memory and learning
 - [x] Persistent conversation history
-- [ ] Episodic memory and session summaries
-- [ ] Searchable knowledge store with provenance
+- [x] Explicit episodic, semantic and procedural memory records with provenance and confidence (initial)
+- [x] Searchable active memory retrieval injected into agent context (initial)
+- [x] User controls to list, deactivate and delete memories (initial)
+- [ ] Verified session and mission summarisation into episodic memory
 - [ ] User-directed learning missions
 - [ ] Gap analysis and curriculum generation
 - [ ] Practice tasks and skill assessments
