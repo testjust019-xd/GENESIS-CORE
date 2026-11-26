@@ -10,6 +10,7 @@ from genesis_core.agent import AgentRuntime, ModelError
 from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
 from genesis_core.mission_engine import MissionEngine, MissionEngineError
+from genesis_core.multi_agent import MultiAgentEngine
 from genesis_core.memory import MemoryError, MemoryStore
 from genesis_core.conversation_memory import ConversationMemoryEngine, ConversationMemoryError
 from genesis_core.knowledge import KnowledgeError, KnowledgeStore
@@ -36,7 +37,8 @@ def run_tui() -> int:
     tool_registry = build_core_registry(genesis_home / "workspace")
     tool_executor = ToolExecutor(tool_registry, PermissionManager(), approvals)
     agent = AgentRuntime(store=store, tool_executor=tool_executor)
-    mission_engine = MissionEngine(store, missions, agent)
+    multi_agent = MultiAgentEngine(store)
+    mission_engine = MissionEngine(store, missions, agent, multi_agent=multi_agent)
     memories = MemoryStore(store)
     conversation_memory = ConversationMemoryEngine(store, memories)
     knowledge = KnowledgeStore(store)
