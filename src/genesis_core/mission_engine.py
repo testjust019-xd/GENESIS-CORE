@@ -68,7 +68,7 @@ class MissionEngine:
             f"independent steps, maximum {MAX_MISSION_TASKS}. Do not claim to execute anything. "
             "Return ONLY JSON in this shape: "
             '{"tasks":[{"title":"short step title","instructions":"specific step instructions"}]}. '
-            "Keep each step focused and verifiable. Objective:\\n" + objective
+            "Keep each step focused and verifiable. Objective:\n" + objective
         )
         raw = self.agent._adapter().chat([
             {"role": "system", "content": (
@@ -113,9 +113,9 @@ class MissionEngine:
             self.missions.set_status(mission_id, "running")
         self.missions.set_task_status(task["id"], "running")
         task_prompt = (
-            f"MISSION OBJECTIVE: {mission['description'] or mission['title']}\\n"
-            f"CURRENT STEP {task['position']}: {task['title']}\\n"
-            f"INSTRUCTIONS: {task['instructions']}\\n"
+            f"MISSION OBJECTIVE: {mission['description'] or mission['title']}\n"
+            f"CURRENT STEP {task['position']}: {task['title']}\n"
+            f"INSTRUCTIONS: {task['instructions']}\n"
             "Work only on this step. Use only available GENESIS tools and permissions. "
             "Do not claim external work was done without evidence. Give a concise result "
             "and explicitly state if blocked or if user input is required."
