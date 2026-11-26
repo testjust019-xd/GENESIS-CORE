@@ -114,6 +114,8 @@ class MemoryStore:
         tasks = mission_store.list_tasks(mission_id)
         if not tasks or any(task["status"] != "completed" for task in tasks):
             raise MemoryError("Every mission task must be completed before capture.")
+        if any("Observer:" not in task["result"] for task in tasks):
+            raise MemoryError("Every task needs a persisted observer decision before capture.")
 
         source_ref = f"mission:{mission_id}"
         with self._connect() as db:
