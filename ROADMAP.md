@@ -112,6 +112,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [ ] Plugin SDK
 - [ ] Export / import portable agent identity
 - [ ] Compatible memory transfer between models
+- [x] Initial sequential multi-agent specialist orchestration using the primary model only
 - [ ] Optional multi-model specialist network
 - [ ] Extension catalogue and signing / trust metadata
 
