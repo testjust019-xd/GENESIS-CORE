@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from genesis_core.agent import ModelError
+from genesis_core.adapters import create_chat_adapter
 from genesis_core.state import StateStore
 
 MAX_ROLES = 4
@@ -58,7 +59,7 @@ class MultiAgentError(RuntimeError):
 class MultiAgentEngine:
     """Sequential specialist delegation with one configured model and durable run history."""
 
-    def __init__(self, store: StateStore, adapter: Any, max_roles: int = MAX_ROLES) -> None:
+    def __init__(self, store: StateStore, adapter: Any | None = None, max_roles: int = MAX_ROLES) -> None:
         self.store = store
         self.adapter = adapter
         self.max_roles = max(1, min(max_roles, MAX_ROLES))
@@ -104,8 +105,9 @@ class MultiAgentEngine:
 
         run_id = uuid.uuid4().hex[:16]
         now = datetime.now(timezone.utc).isoformat()
-        provider = getattr(getattr(self.adapter, "config", None), "provider", "unknown")
-        model = getattr(getattr(self.adapter, "config", None), "model", "unknown")
+        adapter = self.adapter or create_chat_adapter()
+        provider = getattr(getattr(adapter, "config", None), "provider", "unknown")
+        model = getattr(getattr(adapter, "config", None), "model", "unknown")
         with sqlite3.connect(self.store.database_path) as db:
             db.execute(
                 "INSERT INTO agent_collaboration_runs VALUES (?, ?, ?, ?, 'running', ?, NULL)",
@@ -127,7 +129,7 @@ class MultiAgentEngine:
                         "Do not request elevated permissions or bypass GENESIS controls.",
                     ],
                 }
-                output = self.adapter.chat([
+                output = adapter.chat([
                     {"role": "system", "content": (
                         f"You are the GENESIS {spec['label']} specialist. "
                         "You are one role in a sequential collaboration, not an independent model. "
