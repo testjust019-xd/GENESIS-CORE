@@ -6,7 +6,7 @@ import json
 import os
 import shlex
 from pathlib import Path
-from genesis_core.agent import AgentRuntime, ModelError, build_default_tool_executor
+from genesis_core.agent import AgentRuntime, ModelError
 from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
 from genesis_core.state import StateStore
@@ -24,13 +24,12 @@ BANNER = r"""
 
 def run_tui() -> int:
     store = StateStore()
-    tool_executor, approvals = build_default_tool_executor(store)
-    agent = AgentRuntime(store=store, tool_executor=tool_executor)
     missions = MissionStore(state=store)
     genesis_home = Path(os.environ.get("GENESIS_HOME", Path.home() / ".genesis"))
     approvals = ApprovalStore(store.database_path)
     tool_registry = build_core_registry(genesis_home / "workspace")
     tool_executor = ToolExecutor(tool_registry, PermissionManager(), approvals)
+    agent = AgentRuntime(store=store, tool_executor=tool_executor)
     current = None
     sessions = store.list_sessions(limit=1)
     if sessions:
