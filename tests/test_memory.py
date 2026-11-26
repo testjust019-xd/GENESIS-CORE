@@ -55,3 +55,54 @@ def test_invalid_memory_is_rejected(tmp_path, kwargs):
     memory = MemoryStore(StateStore(tmp_path / "genesis.db"))
     with pytest.raises(MemoryError):
         memory.add(**kwargs)
+
+
+def test_completed_mission_can_be_captured_as_idempotent_episode(tmp_path):
+    from genesis_core.missions import MissionStore
+
+    state = StateStore(tmp_path / "genesis.db")
+    missions = MissionStore(state)
+    memory = MemoryStore(state)
+    mission = missions.create("Build a verified report", "Collect and verify project findings.")
+    session = state.create_session("Mission: Build a verified report")
+    tasks = missions.save_plan(mission["id"], session["id"], [
+        {"title": "Inspect sources", "instructions": "Review source material."},
+        {"title": "Check findings", "instructions": "Verify the findings."},
+    ])
+    missions.set_task_status(tasks[0]["id"], "completed", "Reviewed the repository. Observer: confirmed.")
+    missions.set_task_status(tasks[1]["id"], "completed", "Cross-checked the results. Observer: confirmed.")
+    missions.set_status(mission["id"], "running")
+    missions.set_status(mission["id"], "completed")
+
+    saved = memory.capture_completed_mission(missions, mission["id"])
+    repeated = memory.capture_completed_mission(missions, mission["id"])
+
+    assert saved["id"] == repeated["id"]
+    assert saved["memory_type"] == "episodic"
+    assert saved["source_type"] == "mission"
+    assert saved["source_ref"] == f"mission:{mission['id']}"
+    assert "Inspect sources" in saved["content"]
+    assert "Observer: confirmed" in saved["content"]
+
+
+def test_incomplete_mission_cannot_be_captured(tmp_path):
+    from genesis_core.missions import MissionStore
+
+    state = StateStore(tmp_path / "genesis.db")
+    missions = MissionStore(state)
+    memory = MemoryStore(state)
+    mission = missions.create("Incomplete mission")
+    session = state.create_session("Mission: Incomplete mission")
+    tasks = missions.save_plan(mission["id"], session["id"], [
+        {"title": "First step", "instructions": "Do the first step."}
+    ])
+
+    with pytest.raises(MemoryError, match="Only completed missions"):
+        memory.capture_completed_mission(missions, mission["id"])
+
+    missions.set_status(mission["id"], "running")
+    missions.set_task_status(tasks[0]["id"], "blocked", "Needs review.")
+    missions.set_status(mission["id"], "blocked")
+    with pytest.raises(MemoryError, match="Only completed missions"):
+        memory.capture_completed_mission(missions, mission["id"])
+
