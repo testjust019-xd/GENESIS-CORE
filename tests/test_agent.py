@@ -44,3 +44,26 @@ def test_agent_includes_recent_conversation_context(tmp_path):
     assert adapter.seen_messages[-3]["content"] == "Earlier context"
     assert adapter.seen_messages[-2]["content"] == "Earlier answer"
     assert adapter.seen_messages[-1]["content"] == "Continue"
+
+
+
+def test_agent_injects_relevant_managed_memory(tmp_path):
+    from genesis_core.memory import MemoryStore
+
+    store = StateStore(tmp_path / "genesis.db")
+    session = store.create_session()
+    memories = MemoryStore(store)
+    memories.add(
+        "semantic", "The GENESIS workspace is stored in SQLite.",
+        source_type="user", source_ref="manual note", confidence=0.9,
+    )
+    adapter = FakeAdapter()
+
+    AgentRuntime(store=store, adapter=adapter, memory_store=memories).chat(
+        session["id"], "Where is the GENESIS workspace stored?"
+    )
+
+    recalled = [m["content"] for m in adapter.seen_messages if "RECALLED GENESIS MEMORY" in m["content"]]
+    assert len(recalled) == 1
+    assert "stored in SQLite" in recalled[0]
+    assert "manual note" in recalled[0]
