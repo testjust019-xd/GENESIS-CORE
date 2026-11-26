@@ -161,9 +161,49 @@ class KnowledgeStore:
         file_path = Path(path).expanduser().resolve(strict=True)
         if not file_path.is_file():
             raise KnowledgeError("The selected path is not a regular file.")
-        if file_path.suffix.lower() not in {".txt", ".md", ".markdown", ".rst"}:
-            raise KnowledgeError("Supported file types: .txt, .md, .markdown and .rst.")
+        suffix = file_path.suffix.lower()
+        if suffix not in {".txt", ".md", ".markdown", ".rst", ".pdf"}:
+            raise KnowledgeError("Supported file types: .txt, .md, .markdown, .rst and .pdf.")
         size = file_path.stat().st_size
+        if suffix == ".pdf":
+            if size > 20 * 1024 * 1024:
+                raise KnowledgeError("PDF exceeds the 20 MB import limit.")
+            try:
+                from pypdf import PdfReader
+            except ImportError as exc:
+                raise KnowledgeError(
+                    "PDF support is optional. Install it with: "
+                    "pip install 'genesis-core[documents]'"
+                ) from exc
+            try:
+                reader = PdfReader(str(file_path))
+                if reader.is_encrypted:
+                    raise KnowledgeError("Password-protected PDFs are not supported.")
+                if len(reader.pages) > 500:
+                    raise KnowledgeError("PDF exceeds the 500 page import limit.")
+                page_text = []
+                for index, page in enumerate(reader.pages):
+                    extracted = page.extract_text() or ""
+                    if extracted.strip():
+                        page_text.append(f"[Page {index + 1}]\\n{extracted}")
+                content = "\\n\\n".join(page_text)
+            except KnowledgeError:
+                raise
+            except Exception as exc:
+                raise KnowledgeError(f"Could not extract PDF text: {exc}") from exc
+            if not content.strip():
+                raise KnowledgeError(
+                    "No selectable text found in this PDF. Scanned PDFs need OCR, "
+                    "which is not included yet."
+                )
+            if len(content) > self.MAX_DOCUMENT_CHARS:
+                raise KnowledgeError("Extracted PDF text exceeds the 1,000,000 character limit.")
+            return self.ingest_text(
+                title=file_path.name,
+                content=content,
+                source_uri=str(file_path),
+                metadata={"format": suffix, "size_bytes": size, "page_count": len(reader.pages)},
+            )
         if size > self.MAX_DOCUMENT_CHARS * 4:
             raise KnowledgeError("File exceeds the 4 MB import limit.")
         try:
@@ -174,7 +214,7 @@ class KnowledgeStore:
             title=file_path.name,
             content=content,
             source_uri=str(file_path),
-            metadata={"format": file_path.suffix.lower(), "size_bytes": size},
+            metadata={"format": suffix, "size_bytes": size},
         )
 
     def list_documents(self, limit: int = 100) -> list[dict[str, Any]]:
