@@ -161,3 +161,69 @@ def test_interrupted_running_task_can_be_resumed(tmp_path):
     assert result["task"]["status"] == "completed"
     assert "interrupted during a previous run" in adapter.calls[0][-1]["content"]
     assert result["mission"]["status"] == "completed"
+
+
+def test_adaptive_replan_preserves_completed_work_and_records_history(tmp_path):
+    state = StateStore(tmp_path / "genesis.db")
+    missions = MissionStore(state)
+    mission = missions.create("Prepare a launch report", "Prepare a verified launch report.")
+    session = state.create_session("Mission: launch report")
+    original = missions.save_plan(mission["id"], session["id"], [
+        {"title": "Collect data", "instructions": "Collect available data."},
+        {"title": "Access private dashboard", "instructions": "Inspect the private dashboard."},
+        {"title": "Write report", "instructions": "Write the report."},
+    ], metadata={"success_criteria": ["Report cites evidence"]})
+    missions.set_status(mission["id"], "running")
+    missions.set_task_status(original[0]["id"], "completed", "Collected public release notes.")
+    missions.set_task_status(original[1]["id"], "blocked", "Dashboard access is unavailable.")
+    missions.set_status(mission["id"], "blocked")
+
+    revised_document = {
+        "summary": "Use public sources instead of the unavailable dashboard.",
+        "success_criteria": ["Report cites public sources"],
+        "assumptions": ["Public release notes are sufficient"],
+        "risks": ["Some private metrics will be unavailable"],
+        "tasks": [
+            {"title": "Cross-check public sources", "instructions": "Compare official public sources."},
+            {"title": "Write evidence-based report", "instructions": "Write the report and note limitations."},
+        ],
+    }
+    adapter = ScriptedAdapter([json.dumps(revised_document)])
+    engine = MissionEngine(state, missions, AgentRuntime(store=state, adapter=adapter))
+
+    result = engine.replan(mission["id"], reason="Use only accessible public information.")
+
+    assert result["replanned"] is True
+    assert result["preserved_completed"] == 1
+    assert result["tasks"][0]["id"] == original[0]["id"]
+    assert result["tasks"][0]["status"] == "completed"
+    assert [item["title"] for item in result["tasks"][1:]] == [
+        "Cross-check public sources", "Write evidence-based report"
+    ]
+    history = engine.plan_history(mission["id"])
+    assert len(history) == 2
+    assert history[0]["version"] == 1
+    assert history[1]["version"] == 2
+    assert "Dashboard access is unavailable" in history[1]["plan"]["tasks"][1]["result"]
+    assert "Collected public release notes" in adapter.calls[0][-1]["content"]
+
+
+def test_replan_requires_blocked_mission_and_keeps_old_plan_on_invalid_output(tmp_path):
+    state = StateStore(tmp_path / "genesis.db")
+    missions = MissionStore(state)
+    mission = missions.create("Blocked objective")
+    session = state.create_session("Mission: blocked objective")
+    tasks = missions.save_plan(mission["id"], session["id"], [
+        {"title": "First", "instructions": "Do first."}
+    ])
+    adapter = ScriptedAdapter(["not valid JSON"])
+    engine = MissionEngine(state, missions, AgentRuntime(store=state, adapter=adapter))
+
+    with pytest.raises(MissionEngineError):
+        engine.replan(mission["id"])
+    assert missions.list_tasks(mission["id"])[0]["id"] == tasks[0]["id"]
+    assert len(engine.plan_history(mission["id"])) == 1
+
+    missions.set_status(mission["id"], "running")
+    with pytest.raises(MissionEngineError):
+        engine.replan(mission["id"])
