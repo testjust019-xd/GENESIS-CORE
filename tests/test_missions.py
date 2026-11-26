@@ -1,3 +1,5 @@
+import sqlite3
+
 import pytest
 
 from genesis_core.missions import MissionError, MissionStore
@@ -46,3 +48,30 @@ def test_mission_validation(tmp_path):
         missions.create("   ")
     with pytest.raises(MissionError):
         missions.create("Bad priority", priority=9)
+
+def test_existing_mission_database_is_migrated(tmp_path):
+    database = tmp_path / "genesis.db"
+    with sqlite3.connect(database) as db:
+        db.execute("""
+            CREATE TABLE missions (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL,
+                priority INTEGER NOT NULL DEFAULT 3,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        db.execute(
+            "INSERT INTO missions VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ("legacy123", "Legacy mission", "", "planned", 3, "2026-01-01", "2026-01-01"),
+        )
+
+    missions = MissionStore(StateStore(database))
+    legacy = missions.get("legacy123")
+    created = missions.create("New schema mission")
+
+    assert legacy is not None
+    assert legacy["session_id"] is None
+    assert created["session_id"] is None
