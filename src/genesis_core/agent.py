@@ -59,9 +59,9 @@ def _partial_final_message(raw: str) -> str:
     """Decode the available prefix of a streamed final-action JSON message."""
     import re
 
-    if not re.search(r'"action"\\s*:\\s*"final"', raw):
+    if not re.search(r'"action"\s*:\s*"final"', raw):
         return ""
-    match = re.search(r'"message"\\s*:\\s*"', raw)
+    match = re.search(r'"message"\s*:\s*"', raw)
     if not match:
         return ""
     encoded = []
@@ -70,7 +70,7 @@ def _partial_final_message(raw: str) -> str:
         if escaped:
             encoded.append(char)
             escaped = False
-        elif char == "\\\\":
+        elif char == "\\":
             encoded.append(char)
             escaped = True
         elif char == '"':
