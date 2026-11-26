@@ -45,7 +45,8 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Searchable active memory retrieval injected into agent context (initial)
 - [x] User controls to list, deactivate and delete memories (initial)
 - [x] Explicit capture of fully completed missions into episodic memory using persisted observer-checked outcomes (initial)
-- [x] User-triggered conversation memory proposals with exact user-message evidence and explicit review (initial)\n- [ ] Verified conversation/session summarisation into episodic memory
+- [x] User-triggered conversation memory proposals with exact user-message evidence and explicit review (initial)
+- [ ] Verified conversation/session summarisation into episodic memory
 - [ ] User-directed learning missions
 - [ ] Gap analysis and curriculum generation
 - [ ] Practice tasks and skill assessments
