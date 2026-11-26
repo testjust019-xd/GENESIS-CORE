@@ -34,10 +34,10 @@ cd GENESIS-CORE
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -e ".[web,dev,documents]"
+pip install -e ".[web,dev]"
 ```
 
-## Launch GENESIS
+For optional selectable-text PDF ingestion, install the document extra with `pip install -e ".[documents]"`.\n\n## Launch GENESIS
 
 ```bash
 genesis init
