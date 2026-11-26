@@ -37,7 +37,9 @@ python -m pip install --upgrade pip
 pip install -e ".[web,dev]"
 ```
 
-For optional selectable-text PDF ingestion, install the document extra with `pip install -e ".[documents]"`.\n\n## Launch GENESIS
+For optional selectable-text PDF ingestion, install the document extra with `pip install -e ".[documents]"`.
+
+## Launch GENESIS
 
 ```bash
 genesis init
