@@ -315,7 +315,9 @@ class ResearchStore:
                 else:
                     source_id = uuid.uuid4().hex[:16]
                     db.execute(
-                        "INSERT INTO research_sources VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', '')",
+                        "INSERT INTO research_sources "
+                        "(id, url, title, snippet, provider, published_at, retrieved_at, review_status, review_note) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', '')",
                         (source_id, url, str(item.get("title") or url)[:500],
                          str(item.get("snippet") or "")[:4000], str(item.get("provider") or provider)[:80],
                          item.get("published_at"), now),
