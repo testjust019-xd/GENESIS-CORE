@@ -12,6 +12,7 @@ from genesis_core import __version__
 from genesis_core.config import read_settings, set_model
 from genesis_core.hardware import format_bytes, inspect_hardware
 from genesis_core.models import discover_runtimes
+from genesis_core.onboarding import recommend_models, run_first_start_if_needed, run_setup
 
 DEFAULT_HOME = Path(os.environ.get("GENESIS_HOME", Path.home() / ".genesis"))
 
@@ -81,6 +82,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("doctor", help="inspect host resources and runtime environment")
     subparsers.add_parser("init", help="create the local GENESIS data directory")
+    subparsers.add_parser("setup", help="configure and optionally download a recommended local model")
+    subparsers.add_parser("recommend", help="recommend local models for this machine")
     subparsers.add_parser("models", help="discover local model runtimes and available models")
     model = subparsers.add_parser("model", help="view or configure the primary model")
     model_sub = model.add_subparsers(dest="model_action")
@@ -105,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "tui":
+        run_first_start_if_needed()
         from genesis_core.tui import run_tui
 
         return run_tui()
@@ -113,6 +117,23 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "init":
         return _init()
+    if args.command == "setup":
+        return run_setup()
+    if args.command == "recommend":
+        hardware = inspect_hardware()
+        total = hardware["memory_total_bytes"]
+        available = hardware["memory_available_bytes"]
+        print("GENESIS — RECOMMANDATIONS DE MODÈLES")
+        print(f"RAM totale : {format_bytes(total)}")
+        print(f"RAM disponible : {format_bytes(available)}")
+        for index, item in enumerate(recommend_models(total, available), 1):
+            print(f"  {index}. {item['name']} — {item['label']} (~{item['download_gb']:.2f} Go)")
+            print(f"     {item['description']}")
+            if item["warning"]:
+                print(f"     ATTENTION : {item['warning']}")
+        print("La mémoire nécessaire à l'exécution dépasse la seule taille du téléchargement.")
+        print("Lancer genesis setup pour choisir et installer un modèle via Ollama.")
+        return 0
     if args.command == "model":
         if args.model_action == "set":
             try:
