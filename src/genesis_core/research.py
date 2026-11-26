@@ -173,11 +173,20 @@ class ResearchStore:
                 ).fetchone()
                 if existing:
                     source_id = existing["id"]
+                    new_title = str(item.get("title") or url)[:500]
+                    new_snippet = str(item.get("snippet") or "")[:4000]
+                    current = db.execute(
+                        "SELECT title, snippet FROM research_sources WHERE id = ?", (source_id,)
+                    ).fetchone()
+                    changed = current["title"] != new_title or current["snippet"] != new_snippet
                     db.execute(
                         "UPDATE research_sources SET title = ?, snippet = ?, provider = ?, "
-                        "published_at = ?, retrieved_at = ? WHERE id = ?",
-                        (str(item.get("title") or url)[:500], str(item.get("snippet") or "")[:4000],
-                         str(item.get("provider") or provider)[:80], item.get("published_at"), now, source_id),
+                        "published_at = ?, retrieved_at = ?, "
+                        "review_status = CASE WHEN ? THEN 'pending' ELSE review_status END, "
+                        "review_note = CASE WHEN ? THEN 'Search result changed; review this snapshot again.' ELSE review_note END "
+                        "WHERE id = ?",
+                        (new_title, new_snippet, str(item.get("provider") or provider)[:80],
+                         item.get("published_at"), now, int(changed), int(changed), source_id),
                     )
                 else:
                     source_id = uuid.uuid4().hex[:16]
