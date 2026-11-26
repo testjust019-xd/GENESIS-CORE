@@ -75,8 +75,6 @@ def test_agent_streams_decoded_final_message_and_persists_reply(tmp_path):
 def test_studio_stream_endpoint_sends_sse_delta_and_final_message(tmp_path, monkeypatch):
     from types import SimpleNamespace
 
-    from fastapi.testclient import TestClient
-
     from genesis_core import web
 
     state = StateStore(tmp_path / "studio-stream.db")
@@ -96,14 +94,11 @@ def test_studio_stream_endpoint_sends_sse_delta_and_final_message(tmp_path, monk
             )
 
     monkeypatch.setattr(web, "agent", FakeAgent())
-    client = TestClient(web.app)
-    response = client.post(
-        f"/api/sessions/{session['id']}/messages/stream",
-        json={"content": "Hi"},
-    )
+    response = web.stream_message(session["id"], web.MessageInput(content="Hi"))
+    frames = list(response.body_iterator)
+    body = "".join(frames)
 
-    assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/event-stream")
-    assert '"type": "delta"' in response.text
-    assert "Hello there" in response.text
-    assert '"type": "done"' in response.text
+    assert response.media_type == "text/event-stream"
+    assert '"type": "delta"' in body
+    assert "Hello there" in body
+    assert '"type": "done"' in body
