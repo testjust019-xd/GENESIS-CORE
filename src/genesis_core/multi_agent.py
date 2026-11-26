@@ -95,7 +95,7 @@ class MultiAgentEngine:
         objective = objective.strip()
         if not objective or len(objective) > MAX_OBJECTIVE_CHARS:
             raise MultiAgentError(f"Objective must contain 1 to {MAX_OBJECTIVE_CHARS} characters.")
-        selected = roles or ["researcher", "analyst", "planner", "reviewer"]
+        selected = roles if roles is not None else ["researcher", "analyst", "planner", "reviewer"]
         if not isinstance(selected, list) or not 1 <= len(selected) <= self.max_roles:
             raise MultiAgentError(f"Choose 1 to {self.max_roles} specialist roles.")
         if any(not isinstance(role, str) or role not in ROLE_CATALOG for role in selected):
