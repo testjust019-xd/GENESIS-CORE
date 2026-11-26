@@ -14,6 +14,7 @@ from genesis_core.memory import MemoryError, MemoryStore
 from genesis_core.conversation_memory import ConversationMemoryEngine, ConversationMemoryError
 from genesis_core.knowledge import KnowledgeError, KnowledgeStore
 from genesis_core.research import ResearchEngine, ResearchError
+from genesis_core.skills import SkillError, SkillStore
 from genesis_core.state import StateStore
 from genesis_core.tools import ApprovalStore, PermissionManager, ToolExecutor, build_core_registry
 
@@ -40,6 +41,7 @@ def run_tui() -> int:
     conversation_memory = ConversationMemoryEngine(store, memories)
     knowledge = KnowledgeStore(store)
     research = ResearchEngine(store, knowledge)
+    skills = SkillStore(store.database_path, {item['name'] for item in tool_registry.list()})
     current = None
     sessions = store.list_sessions(limit=1)
     if sessions:
@@ -226,6 +228,41 @@ def run_tui() -> int:
                     print("Usage: /memory list [type] | search <text> | add <episodic|semantic|procedural> <text> | mission <id> | extract [session-id] | candidates [session-id] | candidate <id> accept|reject | off|delete <id>")
             except (MemoryError, ConversationMemoryError, KeyError, ModelError) as exc:
                 print(f"Memory error: {exc}")
+        elif command == "/skills":
+            try:
+                status = args[1] if len(args) > 1 else None
+                for item in skills.list(status):
+                    print(f"[{item['status']}] {item['id']} v{item['version']} — {item['name']}: {item['description']}")
+                if not skills.list(status):
+                    print("No skills found.")
+            except SkillError as exc:
+                print(f"Skills error: {exc}")
+        elif command == "/skill":
+            try:
+                if args and args[0] == "create":
+                    raw_value = raw[len("/skill create"):].strip()
+                    parts_value = [part.strip() for part in raw_value.split("|", 2)]
+                    if len(parts_value) != 3:
+                        raise SkillError("Usage: /skill create <name> | <description> | <instructions>")
+                    item = skills.create(parts_value[0], parts_value[1], parts_value[2],
+                                         checklist=["Review instructions for accuracy and safety"])
+                    print(f"Draft skill created: {item['id']} — {item['name']}. Submit it for review.")
+                elif len(args) == 2 and args[0] == "submit":
+                    item = skills.submit(args[1])
+                    print(f"Skill {item['id']} is pending review.")
+                elif len(args) == 3 and args[0] == "review":
+                    item = skills.review(args[1], args[2])
+                    print(f"Skill {item['id']} is now {item['status']}.")
+                elif len(args) == 2 and args[0] == "disable":
+                    item = skills.disable(args[1])
+                    print(f"Skill {item['id']} disabled.")
+                elif len(args) == 2 and args[0] == "versions":
+                    for version in skills.versions(args[1]):
+                        print(f"v{version['version']} · {version['created_at']} — {version['manifest']['name']}")
+                else:
+                    print("Usage: /skill create <name> | <description> | <instructions> | submit <id> | review <id> approve|reject | disable <id> | versions <id>")
+            except (SkillError, KeyError) as exc:
+                print(f"Skill error: {exc}")
         elif command == "/research":
             try:
                 if len(args) >= 2 and args[0] == "search":

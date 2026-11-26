@@ -79,7 +79,16 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [ ] Audio transcription and analysis
 - [ ] Video frame and audio pipeline
 
-## Milestone 5 — Training and evolution
+## Milestone 5 — Skills and evaluation
+- [x] Declarative skill manifests with instructions, tool scope and review checklist (initial)
+- [x] Draft / pending / active / disabled lifecycle with explicit human approval (initial)
+- [x] Immutable version snapshots and safe manifest import/export (initial)
+- [x] Relevant active skill context in the agent runtime (initial)
+- [ ] Skill execution harness with isolated, permissioned tool workflows
+- [ ] Automated skill evaluation and regression benchmarks
+- [ ] Skill marketplace and signing / trust metadata
+
+## Milestone 6 — Training and evolution
 - [ ] Dataset curation and consent / licensing checks
 - [ ] Baseline benchmark suite
 - [ ] Optional LoRA training integrations
@@ -87,14 +96,14 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [ ] Regression gates and rollback
 - [ ] Hardware-aware training profiles
 
-## Milestone 6 — Background autonomy
+## Milestone 7 — Background autonomy
 - [ ] Scheduler and quiet hours
 - [ ] User-defined goals and resource budgets
 - [ ] Pause / resume / stop controls
 - [ ] Daily learning reports
 - [ ] Safe self-extension workflow
 
-## Milestone 7 — Ecosystem
+## Milestone 8 — Ecosystem
 - [ ] Plugin SDK
 - [ ] Export / import portable agent identity
 - [ ] Compatible memory transfer between models
