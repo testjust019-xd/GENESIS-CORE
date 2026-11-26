@@ -83,7 +83,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("models", help="discover local model runtimes and available models")
     subparsers.add_parser("tui", help="open the interactive GENESIS terminal workspace")
 
-    serve = subparsers.add_parser("studio", aliases=["serve"], help="open GENESIS Studio in your browser")
+    serve = subparsers.add_parser(
+        "studio", aliases=["serve"], help="open GENESIS Studio in your browser"
+    )
     serve.add_argument("--host", default="127.0.0.1", help="bind address (default: localhost only)")
     serve.add_argument("--port", type=int, default=8765, help="port (default: 8765)")
 
