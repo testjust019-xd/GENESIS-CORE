@@ -82,8 +82,8 @@ class SkillStore:
             unknown = set(allowed_tools) - self.tool_names
             if unknown:
                 raise SkillError("Unknown registered tool(s): " + ", ".join(sorted(unknown)))
-        if not isinstance(checklist, list) or not 1 <= len(checklist) <= 20:
-            raise SkillError("Provide 1–20 review checklist items before activation.")
+        if not isinstance(checklist, list) or len(checklist) > 20:
+            raise SkillError("A review checklist may contain at most 20 items.")
         if any(not isinstance(item, str) or not item.strip() or len(item) > 300
                for item in checklist):
             raise SkillError("Each checklist item must contain 1–300 characters.")
