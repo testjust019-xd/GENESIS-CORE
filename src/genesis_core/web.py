@@ -16,6 +16,7 @@ from genesis_core.memory import MemoryError, MemoryStore
 from genesis_core.conversation_memory import ConversationMemoryEngine, ConversationMemoryError
 from genesis_core.knowledge import KnowledgeError, KnowledgeStore
 from genesis_core.research import ResearchEngine, ResearchError
+from genesis_core.skills import SkillError, SkillStore
 from genesis_core.state import StateStore
 from genesis_core.tools import ToolError
 
@@ -29,6 +30,7 @@ memory_store = MemoryStore(store)
 conversation_memory = ConversationMemoryEngine(store, memory_store)
 knowledge_store = KnowledgeStore(store)
 research_engine = ResearchEngine(store, knowledge_store)
+skill_store = SkillStore(store.database_path, {item['name'] for item in tool_executor.registry.list()})
 
 
 class SessionInput(BaseModel):
@@ -68,6 +70,25 @@ class KnowledgeSearchInput(BaseModel):
 class ResearchInput(BaseModel):
     query: str = Field(min_length=1, max_length=500)
     limit: int = Field(default=8, ge=1, le=20)
+
+
+class SkillInput(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    description: str = Field(min_length=1, max_length=500)
+    instructions: str = Field(min_length=1, max_length=12000)
+    allowed_tools: list[str] = Field(default_factory=list, max_length=30)
+    checklist: list[str] = Field(default_factory=lambda: ["Review instructions for accuracy and safety"], max_length=20)
+
+
+class SkillUpdateInput(BaseModel):
+    description: str | None = Field(default=None, max_length=500)
+    instructions: str | None = Field(default=None, max_length=12000)
+    allowed_tools: list[str] | None = Field(default=None, max_length=30)
+    checklist: list[str] | None = Field(default=None, max_length=20)
+
+
+class SkillReviewInput(BaseModel):
+    decision: str
 
 
 class ResearchReviewInput(BaseModel):
@@ -231,6 +252,100 @@ def review_memory_candidate(candidate_id: str, payload: MemoryCandidateDecisionI
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Memory candidate not found") from exc
     except ConversationMemoryError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/skills")
+def list_skills(status: str | None = None) -> dict:
+    try:
+        return {"skills": skill_store.list(status)}
+    except SkillError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/skills")
+def create_skill(payload: SkillInput) -> dict:
+    try:
+        return {"skill": skill_store.create(
+            payload.name, payload.description, payload.instructions,
+            payload.allowed_tools, payload.checklist,
+        )}
+    except SkillError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/skills/{skill_id}")
+def get_skill(skill_id: str) -> dict:
+    item = skill_store.get(skill_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Skill not found")
+    return {"skill": item}
+
+
+@app.put("/api/skills/{skill_id}")
+def update_skill(skill_id: str, payload: SkillUpdateInput) -> dict:
+    try:
+        return {"skill": skill_store.update(
+            skill_id, description=payload.description, instructions=payload.instructions,
+            allowed_tools=payload.allowed_tools, checklist=payload.checklist,
+        )}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Skill not found") from exc
+    except SkillError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/skills/{skill_id}/submit")
+def submit_skill(skill_id: str) -> dict:
+    try:
+        return {"skill": skill_store.submit(skill_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Skill not found") from exc
+    except SkillError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/skills/{skill_id}/review")
+def review_skill(skill_id: str, payload: SkillReviewInput) -> dict:
+    try:
+        return {"skill": skill_store.review(skill_id, payload.decision)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Skill not found") from exc
+    except SkillError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/skills/{skill_id}/disable")
+def disable_skill(skill_id: str) -> dict:
+    try:
+        return {"skill": skill_store.disable(skill_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Skill not found") from exc
+    except SkillError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/skills/{skill_id}/versions")
+def list_skill_versions(skill_id: str) -> dict:
+    try:
+        return {"versions": skill_store.versions(skill_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Skill not found") from exc
+
+
+@app.get("/api/skills/{skill_id}/export")
+def export_skill(skill_id: str) -> dict:
+    try:
+        return {"manifest": skill_store.export_manifest(skill_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Skill not found") from exc
+
+
+@app.post("/api/skills/import")
+def import_skill(payload: dict) -> dict:
+    try:
+        return {"skill": skill_store.import_manifest(payload)}
+    except SkillError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
