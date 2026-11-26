@@ -22,7 +22,7 @@ class ToolValidationError(ToolError, ValueError):
     """Raised when tool arguments do not match their JSON schema."""
 
 
-class ToolPermissionError(ToolError, PermissionError):
+class ToolPermissionError(ToolError):
     """Raised when a tool is denied by the active permission profile."""
 
 
