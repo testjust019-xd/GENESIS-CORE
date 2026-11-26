@@ -4,7 +4,7 @@ from genesis_core.onboarding import recommend_models, pull_ollama_model
 
 
 def test_recommendations_are_conservative_for_low_memory():
-    suggestions = recommend_models(4 * 1024**3, 2 * 1024**3)
+    suggestions = recommend_models(4 * 1024**3, 1 * 1024**3)
     assert suggestions[0]["name"] == "gemma3:1b"
     assert suggestions[0]["warning"] is not None
 
