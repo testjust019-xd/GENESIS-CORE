@@ -132,7 +132,7 @@ def run_tui() -> int:
                     "output": result.output, "approval_id": result.approval_id,
                     "reason": result.reason,
                 }, indent=2, ensure_ascii=False))
-            except (ValueError, TypeError, Exception) as exc:
+            except Exception as exc:
                 print(f"Tool error: {exc}")
         elif command == "/tools":
             for tool in tool_registry.list():
