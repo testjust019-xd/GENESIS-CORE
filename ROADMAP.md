@@ -1,32 +1,40 @@
 # GENESIS CORE Roadmap
 
-This roadmap describes intended work. A listed feature is not implemented until it is present, tested and documented.
+This roadmap describes intended work. A feature is complete only when implemented, tested and documented. "Initial" means a usable first slice exists, not that the milestone is finished.
 
 ## Milestone 0 — Foundation
 - [x] Python package and CLI entry point
 - [x] Linux hardware diagnostics
 - [x] Local web status endpoint and dashboard
-- [ ] Automated tests and CI
+- [x] Shared SQLite sessions and messages
+- [x] First-party TUI and Studio foundations
+- [x] Automated test workflow added (first CI result pending)
 - [ ] Configuration validation and structured logs
 
 ## Milestone 1 — Model connectivity
-- [ ] Common model adapter interface
-- [ ] Ollama adapter
-- [ ] llama.cpp server adapter
-- [ ] LM Studio OpenAI-compatible adapter
-- [ ] Hugging Face local adapter
-- [ ] Optional remote API mentor providers
+- [x] Common chat adapter contract (initial)
+- [x] Ollama chat adapter (initial)
+- [x] llama.cpp OpenAI-compatible chat adapter (initial)
+- [x] LM Studio OpenAI-compatible chat adapter (initial)
+- [x] Persistent primary-model selection for supported local runtimes
+- [ ] Run and pass provider adapter tests in CI
+- [ ] Hugging Face Transformers local adapter
+- [ ] Optional remote API mentor providers and secure secret storage
 - [ ] Model capability and context-window inspection
+- [ ] Streaming responses and cancellation
 
 ## Milestone 2 — Agent runtime
+- [x] Basic context-aware chat loop (initial)
 - [ ] Mission and goal representation
 - [ ] Planner / executor / observer loop
 - [ ] Tool registry with JSON schemas
 - [ ] Permission profiles and approval workflow
 - [ ] Timeouts, budgets, retries and audit log
+- [ ] Structured activity events shared by TUI and Studio
 
 ## Milestone 3 — Memory and learning
-- [ ] Session and episodic memory
+- [x] Persistent conversation history
+- [ ] Episodic memory and session summaries
 - [ ] Searchable knowledge store with provenance
 - [ ] User-directed learning missions
 - [ ] Gap analysis and curriculum generation
