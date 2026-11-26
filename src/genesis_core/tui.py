@@ -176,6 +176,9 @@ def run_tui() -> int:
                 if args and args[0] == "add" and len(args) >= 3:
                     item = memories.add(args[1], " ".join(args[2:]), source_type="user")
                     print(f"Saved {item['memory_type']} memory: {item['id']}")
+                elif len(args) == 2 and args[0] == "mission":
+                    item = memories.capture_completed_mission(missions, args[1])
+                    print(f"Captured completed mission as episodic memory: {item['id']}")
                 elif args and args[0] == "list":
                     items = memories.list(memory_type=args[1] if len(args) > 1 else None)
                     for item in items:
@@ -190,7 +193,7 @@ def run_tui() -> int:
                     memories.delete(args[1])
                     print(f"Memory {args[1]} deleted.")
                 else:
-                    print("Usage: /memory list [type] | search <text> | add <episodic|semantic|procedural> <text> | off|delete <id>")
+                    print("Usage: /memory list [type] | search <text> | add <episodic|semantic|procedural> <text> | mission <id> | off|delete <id>")
             except (MemoryError, KeyError) as exc:
                 print(f"Memory error: {exc}")
         elif command == "/missions":
