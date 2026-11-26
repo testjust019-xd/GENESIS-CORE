@@ -15,6 +15,7 @@ from genesis_core.memory import MemoryError, MemoryStore
 from genesis_core.conversation_memory import ConversationMemoryEngine, ConversationMemoryError
 from genesis_core.knowledge import KnowledgeError, KnowledgeStore
 from genesis_core.research import ResearchEngine, ResearchError
+from genesis_core.research_intelligence import ResearchIntelligence, ResearchIntelligenceError
 from genesis_core.skills import SkillError, SkillStore
 from genesis_core.state import StateStore
 from genesis_core.tools import ApprovalStore, PermissionManager, ToolExecutor, build_core_registry
@@ -43,6 +44,7 @@ def run_tui() -> int:
     conversation_memory = ConversationMemoryEngine(store, memories)
     knowledge = KnowledgeStore(store)
     research = ResearchEngine(store, knowledge)
+    research_intelligence = ResearchIntelligence(store)
     skills = SkillStore(store.database_path, {item['name'] for item in tool_registry.list()})
     current = None
     sessions = store.list_sessions(limit=1)
@@ -120,6 +122,8 @@ def run_tui() -> int:
                 "  /research search <query> Search web or local knowledge\n"
                 "  /research sources [pending|approved|rejected] List saved sources\n"
                 "  /research review <id> approve|reject Review a source\n"
+                "  /research report <run-id> [focus] Generate a cited synthesis from approved sources\n"
+                "  /research reports [run-id] List saved research reports\n"
                 "  /missions          List missions\n"
                 "  /mission new <title>  Create a mission\n"
                 "  /mission status <id> <status>  Update mission status\n"
@@ -283,6 +287,26 @@ def run_tui() -> int:
                     for source in research.list_sources(review_status=status):
                         print(f"[{source['review_status']}] {source['id']} — {source['title']}")
                         print(f"  {source['url']}")
+                elif len(args) >= 2 and args[0] == "report":
+                    report = research_intelligence.generate(args[1], " ".join(args[2:]))
+                    print(f"\n{report['title']} · {report['provider']}/{report['model']}")
+                    print(report["summary"])
+                    for claim in report["claims"]:
+                        print(f"  [{claim['classification']}] {claim['text']}")
+                        for source_id in claim["source_ids"]:
+                            print(f"    Source ID: {source_id}")
+                    if report["disagreements"]:
+                        print("Disagreements:")
+                        for item in report["disagreements"]:
+                            print(f"  - {item}")
+                    if report["open_questions"]:
+                        print("Open questions:")
+                        for item in report["open_questions"]:
+                            print(f"  - {item}")
+                    print(report["notice"])
+                elif args and args[0] == "reports":
+                    for item in research_intelligence.list(args[1] if len(args) > 1 else None):
+                        print(f"{item['id']} · run {item['run_id']} · {item['title']}")
                 elif len(args) == 3 and args[0] == "review":
                     decision = {"approve": "approved", "reject": "rejected"}.get(args[2])
                     if not decision:
@@ -290,8 +314,8 @@ def run_tui() -> int:
                     source = research.review_source(args[1], decision)
                     print(f"Source {source['id']} is now {source['review_status']}.")
                 else:
-                    print("Usage: /research search <query> | sources [pending|approved|rejected] | review <id> approve|reject")
-            except (ResearchError, KeyError) as exc:
+                    print("Usage: /research search <query> | sources [pending|approved|rejected] | review <id> approve|reject | report <run-id> [focus] | reports [run-id]")
+            except (ResearchError, ResearchIntelligenceError, KeyError, ModelError) as exc:
                 print(f"Research error: {exc}")
         elif command == "/knowledge":
             try:
