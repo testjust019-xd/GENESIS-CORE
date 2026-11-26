@@ -64,6 +64,9 @@ def test_approval_required_actions_are_persisted_and_gated(tmp_path):
     approvals.decide(pending.approval_id, approved=True)
     result = executor.execute("write_note", {}, approval_id=pending.approval_id)
     assert result.output == {"written": True}
+    assert approvals.get(pending.approval_id)["status"] == "used"
+    with pytest.raises(ToolPermissionError):
+        executor.execute("write_note", {}, approval_id=pending.approval_id)
 
 
 def test_denied_capability_cannot_be_overridden_by_approval(tmp_path):
