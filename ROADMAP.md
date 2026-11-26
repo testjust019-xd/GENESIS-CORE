@@ -10,6 +10,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] First-party TUI and Studio foundations
 - [x] Automated test workflow added and passing
 - [ ] Configuration validation and structured logs
+- [x] Initial local Test Bench for storage, permissions and environment diagnostics
 
 ## Milestone 1 — Model connectivity
 - [x] Common chat adapter contract (initial)
@@ -20,7 +21,8 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Provider adapter and agent-loop tests pass in CI
 - [ ] Hugging Face Transformers local adapter
 - [ ] Optional remote API mentor providers and secure secret storage
-- [x] Hardware-aware first-run model recommendations and opt-in Ollama download (initial)\n- [ ] Model capability and context-window inspection
+- [x] Hardware-aware first-run model recommendations and opt-in Ollama download (initial)
+- [ ] Model capability and context-window inspection
 - [ ] Streaming responses and cancellation
 
 ## Milestone 2 — Agent runtime
@@ -89,7 +91,6 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Declarative skill manifests with instructions, tool scope and review checklist (initial)
 - [x] Draft / pending / active / disabled lifecycle with explicit human approval (initial)
 - [x] Immutable version snapshots and safe manifest import/export (initial)
-- [x] Relevant active skill context in the agent runtime (initial)
 - [ ] Skill execution harness with isolated, permissioned tool workflows
 - [ ] Automated skill evaluation and regression benchmarks
 - [ ] Skill marketplace and signing / trust metadata
@@ -124,4 +125,4 @@ This roadmap describes intended work. A feature is complete only when implemente
 - Optional capabilities must remain optional.
 - Core dependencies should stay lightweight.
 - Every claimed improvement must be evaluated against a reproducible baseline.
-- Tool execution and self-modification must be permissioned and auditable.
+- Tool execution and self-modification require scoped permissions and explicit approval.
