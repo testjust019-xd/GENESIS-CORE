@@ -430,6 +430,24 @@ def list_research_sources(run_id: str | None = None, review_status: str | None =
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+@app.post("/api/research/sources/{source_id}/fetch")
+def fetch_research_source_page(source_id: str) -> dict:
+    try:
+        return {"page": research_engine.fetch_source_page(source_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Research source not found") from exc
+    except ResearchError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/research/sources/{source_id}/page")
+def get_research_source_page(source_id: str) -> dict:
+    try:
+        return {"page": research_engine.get_source_page(source_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Research source not found") from exc
+
+
 @app.post("/api/research/sources/{source_id}/review")
 def review_research_source(source_id: str, payload: ResearchReviewInput) -> dict:
     try:
