@@ -76,7 +76,7 @@ class AgentRuntime:
         self.max_tool_steps = max(1, min(max_tool_steps, 8))
         self.memory_store = memory_store or MemoryStore(self.store)
         self.knowledge_store = knowledge_store or KnowledgeStore(self.store)
-        tool_names = set(self.tool_executor.registry._tools) if self.tool_executor else set()
+        tool_names = {item['name'] for item in self.tool_executor.registry.list()} if self.tool_executor else set()
         self.skill_store = skill_store or SkillStore(self.store.database_path, tool_names)
 
     def _adapter(self) -> ChatAdapter:
