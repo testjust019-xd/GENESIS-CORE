@@ -45,8 +45,24 @@ def test_repeated_url_deduplicates_and_preserves_review_status(tmp_path):
     ])
     updated = store.list_sources(run_id=second["id"])[0]
     assert updated["id"] == source["id"]
-    assert updated["review_status"] == "approved"
+    assert updated["review_status"] == "pending"
     assert updated["title"] == "Updated"
+    assert "changed" in updated["review_note"].lower()
+
+
+def test_unchanged_approved_snapshot_keeps_its_review(tmp_path):
+    store = ResearchStore(StateStore(tmp_path / "genesis.db"))
+    first = store.save_run("first query", "fake", [
+        {"title": "One", "url": "https://example.org/a", "snippet": "same text"}
+    ])
+    source = store.list_sources(run_id=first["id"])[0]
+    store.decide_source(source["id"], "approved", "Reviewed carefully")
+    second = store.save_run("second query", "fake", [
+        {"title": "One", "url": "https://example.org/a", "snippet": "same text"}
+    ])
+    updated = store.list_sources(run_id=second["id"])[0]
+    assert updated["review_status"] == "approved"
+    assert updated["review_note"] == "Reviewed carefully"
 
 
 def test_offline_search_uses_local_knowledge(tmp_path):
