@@ -99,3 +99,72 @@ def test_search_validates_query_and_bounds_limit(tmp_path):
         engine.search(" ")
     result = engine.search("query", limit=1000)
     assert result["source_count"] == 1
+
+
+def test_page_text_parser_ignores_scripts_and_extracts_readable_content():
+    from genesis_core.research import _VisibleTextParser
+
+    parser = _VisibleTextParser()
+    parser.feed("<html><h1>Useful title</h1><script>secret()</script><p>Visible paragraph</p></html>")
+    text = "".join(parser.parts)
+    assert "Useful title" in text
+    assert "Visible paragraph" in text
+    assert "secret()" not in text
+
+
+def test_page_url_validation_blocks_local_and_non_http_targets():
+    from genesis_core.research import _validate_page_url
+
+    with pytest.raises(ResearchError):
+        _validate_page_url("file:///etc/passwd")
+    with pytest.raises(ResearchError):
+        _validate_page_url("http://127.0.0.1/private")
+    with pytest.raises(ResearchError):
+        _validate_page_url("http://localhost/admin")
+    with pytest.raises(ResearchError):
+        _validate_page_url("https://user:pass@example.org/page")
+
+
+def test_fetch_source_page_persists_extracted_text_and_rejects_rejected_source(tmp_path, monkeypatch):
+    import genesis_core.research as research
+
+    state = StateStore(tmp_path / "genesis.db")
+    store = ResearchStore(state)
+    run = store.save_run("topic", "fake", [
+        {"title": "Example", "url": "https://example.org/page", "snippet": "summary"}
+    ])
+    source = store.list_sources(run_id=run["id"])[0]
+    monkeypatch.setattr(research, "fetch_web_page", lambda url: {
+        "url": url, "content_type": "text/html", "text": "Extracted article text",
+        "truncated": False, "characters": 22,
+    })
+
+    result = store.fetch_source_page(source["id"])
+    assert result["text"] == "Extracted article text"
+    saved = store.get_source_page(source["id"])
+    assert saved["page_text"] == "Extracted article text"
+    assert saved["page_fetched_at"]
+
+    store.decide_source(source["id"], "rejected")
+    with pytest.raises(ResearchError):
+        store.fetch_source_page(source["id"])
+
+
+def test_research_store_migrates_existing_source_table(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "legacy.db"
+    with sqlite3.connect(path) as db:
+        db.execute("""
+            CREATE TABLE research_sources (
+                id TEXT PRIMARY KEY, url TEXT NOT NULL UNIQUE, title TEXT NOT NULL,
+                snippet TEXT NOT NULL, provider TEXT NOT NULL, published_at TEXT,
+                retrieved_at TEXT NOT NULL, review_status TEXT NOT NULL DEFAULT 'pending',
+                review_note TEXT NOT NULL DEFAULT ''
+            )
+        """)
+    store = ResearchStore(StateStore(path))
+    with sqlite3.connect(path) as db:
+        columns = {row[1] for row in db.execute("PRAGMA table_info(research_sources)")}
+    assert "page_text" in columns
+    assert "page_fetched_at" in columns

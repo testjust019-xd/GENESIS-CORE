@@ -76,7 +76,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Persistent research runs and source vault
 - [x] Source provenance, URL deduplication and pending/approved/rejected review states
 - [x] TUI, Studio and API research workflows (initial)
-- [ ] Browser page retrieval and extraction with safe URL validation
+- [x] Bounded public web page retrieval and text extraction with URL/redirect validation (initial)
 - [ ] Multi-source claim comparison and citation-backed reports
 - [ ] Automated source freshness and cross-check signals
 - [ ] PDF / document extraction
