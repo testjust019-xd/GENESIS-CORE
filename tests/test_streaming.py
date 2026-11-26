@@ -70,3 +70,40 @@ def test_agent_streams_decoded_final_message_and_persists_reply(tmp_path):
     assert [message["role"] for message in state.list_messages(session["id"])] == [
         "user", "assistant"
     ]
+
+
+def test_studio_stream_endpoint_sends_sse_delta_and_final_message(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from fastapi.testclient import TestClient
+
+    from genesis_core import web
+
+    state = StateStore(tmp_path / "studio-stream.db")
+    session = state.create_session()
+    monkeypatch.setattr(web, "store", state)
+
+    class FakeAgent:
+        def chat(self, session_id, content, on_token=None):
+            user = state.add_message(session_id, "user", content)
+            if on_token:
+                on_token("Hello ")
+                on_token("there")
+            assistant = state.add_message(session_id, "assistant", "Hello there")
+            return SimpleNamespace(
+                user_message=user, assistant_message=assistant,
+                provider="fake-local", model="sse-test", activity=[],
+            )
+
+    monkeypatch.setattr(web, "agent", FakeAgent())
+    client = TestClient(web.app)
+    response = client.post(
+        f"/api/sessions/{session['id']}/messages/stream",
+        json={"content": "Hi"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert '"type": "delta"' in response.text
+    assert "Hello there" in response.text
+    assert '"type": "done"' in response.text
