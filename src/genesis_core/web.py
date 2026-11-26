@@ -18,6 +18,7 @@ from genesis_core.conversation_memory import ConversationMemoryEngine, Conversat
 from genesis_core.knowledge import KnowledgeError, KnowledgeStore
 from genesis_core.research import ResearchEngine, ResearchError
 from genesis_core.research_intelligence import ResearchIntelligence, ResearchIntelligenceError
+from genesis_core.learning import LearningEngine, LearningError
 from genesis_core.skills import SkillError, SkillStore
 from genesis_core.state import StateStore
 from genesis_core.tools import ToolError
@@ -34,6 +35,7 @@ conversation_memory = ConversationMemoryEngine(store, memory_store)
 knowledge_store = KnowledgeStore(store)
 research_engine = ResearchEngine(store, knowledge_store)
 research_intelligence = ResearchIntelligence(store)
+learning_engine = LearningEngine(store)
 skill_store = SkillStore(store.database_path, {item['name'] for item in tool_executor.registry.list()})
 
 
@@ -107,6 +109,14 @@ class ResearchReviewInput(BaseModel):
 
 class ResearchReportInput(BaseModel):
     question: str = Field(default="", max_length=2000)
+
+
+class LearningGoalInput(BaseModel):
+    goal: str = Field(min_length=1, max_length=1000)
+
+
+class LearningAnswerInput(BaseModel):
+    answer: str = Field(min_length=1, max_length=12000)
 
 
 class MemoryInput(BaseModel):
@@ -319,6 +329,47 @@ def review_memory_candidate(candidate_id: str, payload: MemoryCandidateDecisionI
         raise HTTPException(status_code=404, detail="Memory candidate not found") from exc
     except ConversationMemoryError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/learning/courses")
+def list_learning_courses() -> dict:
+    return {"courses": learning_engine.list_courses()}
+
+
+@app.post("/api/learning/courses")
+def create_learning_course(payload: LearningGoalInput) -> dict:
+    try:
+        return {"course": learning_engine.create_course(payload.goal)}
+    except LearningError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ModelError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/learning/courses/{course_id}")
+def get_learning_course(course_id: str) -> dict:
+    try:
+        return {"course": learning_engine.get_course(course_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Learning course not found") from exc
+
+
+@app.post("/api/learning/lessons/{lesson_id}/answer")
+def submit_learning_answer(lesson_id: str, payload: LearningAnswerInput) -> dict:
+    try:
+        return {"assessment": learning_engine.submit_answer(lesson_id, payload.answer)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Learning lesson not found") from exc
+    except LearningError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/learning/lessons/{lesson_id}/attempts")
+def list_learning_attempts(lesson_id: str) -> dict:
+    try:
+        return {"attempts": learning_engine.attempts(lesson_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Learning lesson not found") from exc
 
 
 @app.get("/api/skills")
