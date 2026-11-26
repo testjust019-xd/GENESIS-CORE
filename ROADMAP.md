@@ -77,7 +77,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Source provenance, URL deduplication and pending/approved/rejected review states
 - [x] TUI, Studio and API research workflows (initial)
 - [x] Bounded public web page retrieval and text extraction with URL/redirect validation (initial)
-- [ ] Multi-source claim comparison and citation-backed reports
+- [x] Initial multi-source synthesis with validated source-ID citations (human-approved sources only)
 - [ ] Automated source freshness and cross-check signals
 - [ ] PDF / document extraction
 - [ ] Image analysis adapters
