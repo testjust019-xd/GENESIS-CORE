@@ -5,9 +5,10 @@ from __future__ import annotations
 import os
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 
 def default_database_path() -> Path:
@@ -23,10 +24,14 @@ class StateStore:
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self._initialise()
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.database_path, timeout=10)
         connection.row_factory = sqlite3.Row
-        return connection
+        try:
+            yield connection
+        finally:
+            connection.close()
 
     def _initialise(self) -> None:
         with self._connect() as db:
