@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from genesis_core.adapters import ChatAdapter, ModelError, create_chat_adapter
+from genesis_core.adapters import ChatAdapter, create_chat_adapter
 from genesis_core.state import StateStore
 
 
@@ -154,6 +154,11 @@ class ResearchIntelligence:
         ]
         raw = self._adapter().chat(messages)
         report = self._validate(self._decode(raw), {item["id"] for item in sources})
+        report["sources"] = [{
+            "id": item["id"], "title": item["title"], "url": item["url"],
+            "content_kind": "fetched_page" if item["page_text"] else "search_snippet",
+            "fetched_at": item["page_fetched_at"],
+        } for item in sources]
         config = self._adapter().config
         report_id = uuid.uuid4().hex[:16]
         created_at = datetime.now(timezone.utc).isoformat()
