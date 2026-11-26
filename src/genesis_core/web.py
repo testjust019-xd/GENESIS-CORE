@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
+import queue
+import threading
+
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from genesis_core import __version__
@@ -212,6 +216,51 @@ def add_message(session_id: str, payload: MessageInput) -> dict:
         "agent_runtime": "planner_executor_observer",
         "activity": reply.activity,
     }
+
+
+@app.post("/api/sessions/{session_id}/messages/stream")
+def stream_message(session_id: str, payload: MessageInput):
+    if not store.get_session(session_id):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    events: queue.Queue = queue.Queue()
+
+    def publish(token: str) -> None:
+        events.put({"type": "delta", "content": token})
+
+    def run_agent() -> None:
+        try:
+            reply = agent.chat(session_id, payload.content, on_token=publish)
+            events.put({
+                "type": "done",
+                "message": reply.user_message,
+                "assistant_message": reply.assistant_message,
+                "provider": reply.provider,
+                "model": reply.model,
+                "agent_runtime": "planner_executor_observer",
+                "activity": reply.activity,
+            })
+        except (ModelError, ValueError, KeyError) as exc:
+            events.put({"type": "error", "detail": str(exc)})
+        except Exception:
+            events.put({"type": "error", "detail": "GENESIS encountered an unexpected runtime error."})
+        finally:
+            events.put(None)
+
+    threading.Thread(target=run_agent, daemon=True).start()
+
+    def event_stream():
+        while True:
+            event = events.get()
+            if event is None:
+                break
+            yield "data: " + json.dumps(event, ensure_ascii=False) + "\\n\\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/api/missions")
@@ -706,7 +755,7 @@ function addMessage(m){const box=document.createElement('div');box.className='ms
 async function loadSessions(){const data=await api('/api/sessions');$('sessions').replaceChildren();$('session-count').textContent=data.sessions.length;for(const s of data.sessions){const b=document.createElement('button');b.className='session'+(s.id===activeId?' active':'');b.textContent=s.title;b.onclick=()=>openSession(s.id);$('sessions').append(b)}}
 async function openSession(id){activeId=id;const data=await api('/api/sessions/'+id+'/messages');$('messages').replaceChildren();for(const m of data.messages)addMessage(m);if(!data.messages.length){const p=document.createElement('p');p.className='notice';p.textContent='This conversation is ready. Send a message to save it.';$('messages').append(p)}const list=await api('/api/sessions');const s=list.sessions.find(x=>x.id===id);$('active-title').textContent=s?.title||'Conversation';$('active-sub').textContent='Session '+id+' · shared with GENESIS TUI';await loadSessions()}
 async function newSession(){const data=await api('/api/sessions',{method:'POST',body:JSON.stringify({title:'New conversation'})});await openSession(data.session.id)}
-async function sendMessage(){const input=$('message-input'),button=$('send');const content=input.value.trim();if(!content||button.disabled)return;if(!activeId)await newSession();input.value='';button.disabled=true;button.textContent='Working…';const welcome=$('welcome');if(welcome)welcome.remove();const userBubble=addMessage({role:'user',content});const pending=addMessage({role:'assistant',content:'GENESIS is working…'});$('messages').scrollTop=$('messages').scrollHeight;try{const data=await api('/api/sessions/'+activeId+'/messages',{method:'POST',body:JSON.stringify({content})});pending.querySelector('div:last-child').textContent=data.assistant_message?.content||'No response returned.';const note=document.createElement('div');note.className='hint';note.textContent='Answered by '+data.provider+' · '+data.model;$('messages').append(note);await loadSessions();const s=(await api('/api/sessions')).sessions.find(x=>x.id===activeId);$('active-title').textContent=s?.title||'Conversation'}catch(e){pending.querySelector('div:last-child').textContent='Request failed: '+e.message;throw e}finally{button.disabled=false;button.textContent='Send ↗';$('messages').scrollTop=$('messages').scrollHeight}}
+async function sendMessage(){const input=$('message-input'),button=$('send');const content=input.value.trim();if(!content||button.disabled)return;if(!activeId)await newSession();input.value='';button.disabled=true;button.textContent='Working…';const welcome=$('welcome');if(welcome)welcome.remove();const userBubble=addMessage({role:'user',content});const pending=addMessage({role:'assistant',content:'GENESIS is working…'});$('messages').scrollTop=$('messages').scrollHeight;try{const response=await fetch('/api/sessions/'+activeId+'/messages/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content})});if(!response.ok){const error=await response.json().catch(()=>({}));throw new Error(error.detail||'HTTP '+response.status)}if(!response.body)throw new Error('This browser does not support streamed responses.');const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',completed=null;while(true){const part=await reader.read();buffer+=decoder.decode(part.value||new Uint8Array(),{stream:!part.done});let boundary;while((boundary=buffer.indexOf('\\n\\n'))>=0){const frame=buffer.slice(0,boundary);buffer=buffer.slice(boundary+2);const line=frame.split('\\n').find(x=>x.startsWith('data:'));if(!line)continue;const event=JSON.parse(line.slice(5).trim());if(event.type==='delta'){const body=pending.querySelector('div:last-child');body.textContent+=event.content;$('messages').scrollTop=$('messages').scrollHeight}else if(event.type==='done'){completed=event;pending.querySelector('div:last-child').textContent=event.assistant_message?.content||pending.querySelector('div:last-child').textContent}else if(event.type==='error'){throw new Error(event.detail)}}if(part.done)break}if(!completed)throw new Error('The stream ended before GENESIS returned a final response.');const note=document.createElement('div');note.className='hint';note.textContent='Answered by '+completed.provider+' · '+completed.model;$('messages').append(note);await loadSessions();const s=(await api('/api/sessions')).sessions.find(x=>x.id===activeId);$('active-title').textContent=s?.title||'Conversation'}catch(e){pending.querySelector('div:last-child').textContent='Request failed: '+e.message;throw e}finally{button.disabled=false;button.textContent='Send ↗';$('messages').scrollTop=$('messages').scrollHeight}}
 async function loadLearningCourses(){const data=await api('/api/learning/courses');const box=$('learning-courses');box.replaceChildren();if(!data.courses.length){box.textContent='No learning courses yet.';return}for(const course of data.courses){const button=document.createElement('button');button.textContent=course.title+' · '+course.completed_lessons+' completed · '+course.xp+' XP';button.onclick=()=>showLearningCourse(course.id);box.append(button)}}
 async function showLearningCourse(id){const data=await api('/api/learning/courses/'+id);const course=data.course;const box=$('learning-course-detail');box.replaceChildren();const heading=document.createElement('strong');heading.textContent=course.title+' · '+course.progress_percent+'% · '+course.xp+' XP';const goal=document.createElement('p');goal.textContent=course.goal;box.append(heading,goal);for(const lesson of course.lessons){const button=document.createElement('button');button.textContent=lesson.position+'. '+lesson.title+' · '+(lesson.completed?'Completed':'Best '+lesson.best_score+'%');button.onclick=()=>{activeLearningLessonId=lesson.id;$('learning-answer').value='';$('learning-submit').disabled=false;$('learning-feedback').textContent=lesson.prompt+(lesson.hints.length?'\nHints: '+lesson.hints.join(' · '):'')};box.append(button)}}
 async function createLearningCourse(){const goal=$('learning-goal').value.trim();if(!goal)return;try{const data=await api('/api/learning/courses',{method:'POST',body:JSON.stringify({goal})});$('learning-goal').value='';await loadLearningCourses();await showLearningCourse(data.course.id)}catch(e){alert(e.message)}}
