@@ -231,3 +231,82 @@ def test_replan_requires_blocked_mission_and_keeps_old_plan_on_invalid_output(tm
     missions.set_status(mission["id"], "running")
     with pytest.raises(MissionEngineError):
         engine.replan(mission["id"])
+
+def test_mission_planning_uses_analyst_and_planner_specialists_with_one_model(tmp_path):
+    from genesis_core.multi_agent import MultiAgentEngine
+
+    state = StateStore(tmp_path / "genesis.db")
+    missions = MissionStore(state)
+    mission = missions.create("Specialist-planned mission", "Prepare a concise report.")
+    plan_json = json.dumps({
+        "summary": "A specialist-reviewed plan",
+        "success_criteria": ["Report is complete"],
+        "assumptions": [],
+        "risks": [],
+        "tasks": [{"title": "Draft report", "instructions": "Prepare the report."}],
+    })
+    adapter = ScriptedAdapter(["Identify constraints and missing context.", plan_json])
+    agent = AgentRuntime(store=state, adapter=adapter)
+    specialists = MultiAgentEngine(state, adapter=adapter)
+    engine = MissionEngine(state, missions, agent, multi_agent=specialists)
+
+    result = engine.plan(mission["id"])
+
+    assert result["created"] is True
+    assert result["specialists"] == ["analyst", "planner"]
+    assert result["specialist_run_id"]
+    assert len(adapter.calls) == 2
+    assert "Identify constraints" in adapter.calls[1][1]["content"]
+    assert result["tasks"][0]["title"] == "Draft report"
+
+
+def test_mission_planning_without_multi_agent_keeps_legacy_single_pass(tmp_path):
+    state = StateStore(tmp_path / "genesis.db")
+    missions = MissionStore(state)
+    mission = missions.create("Single pass mission")
+    plan_json = json.dumps({
+        "tasks": [{"title": "One step", "instructions": "Do one step."}]
+    })
+    adapter = ScriptedAdapter([plan_json])
+    engine = MissionEngine(state, missions, AgentRuntime(store=state, adapter=adapter))
+
+    result = engine.plan(mission["id"])
+
+    assert result["created"] is True
+    assert result["specialists"] == []
+    assert len(adapter.calls) == 1
+
+
+def test_adaptive_replanning_uses_analyst_and_planner_specialists(tmp_path):
+    from genesis_core.multi_agent import MultiAgentEngine
+
+    state = StateStore(tmp_path / "genesis.db")
+    missions = MissionStore(state)
+    mission = missions.create("Specialist replan", "Prepare a report.")
+    session = state.create_session("Mission: Specialist replan")
+    tasks = missions.save_plan(mission["id"], session["id"], [
+        {"title": "Blocked access", "instructions": "Access unavailable data."}
+    ])
+    missions.set_status(mission["id"], "running")
+    missions.set_task_status(tasks[0]["id"], "blocked", "The data source is unavailable.")
+    missions.set_status(mission["id"], "blocked")
+    revised_json = json.dumps({
+        "summary": "Use accessible sources",
+        "success_criteria": ["Report documents limitations"],
+        "assumptions": [],
+        "risks": ["Some data is unavailable"],
+        "tasks": [{"title": "Use public data", "instructions": "Use verified public sources."}],
+    })
+    adapter = ScriptedAdapter(["Identify a public alternative.", revised_json])
+    agent = AgentRuntime(store=state, adapter=adapter)
+    engine = MissionEngine(
+        state, missions, agent, multi_agent=MultiAgentEngine(state, adapter=adapter)
+    )
+
+    result = engine.replan(mission["id"], reason="Avoid unavailable data.")
+
+    assert result["replanned"] is True
+    assert result["specialists"] == ["analyst", "planner"]
+    assert result["specialist_run_id"]
+    assert len(adapter.calls) == 2
+    assert "public alternative" in adapter.calls[1][1]["content"]

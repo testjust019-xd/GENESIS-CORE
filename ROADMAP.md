@@ -113,6 +113,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [ ] Export / import portable agent identity
 - [ ] Compatible memory transfer between models
 - [x] Initial sequential multi-agent specialist orchestration using the primary model only
+- [x] Mission planning and adaptive replanning delegated to Analyst → Planner specialists (initial)
 - [ ] Optional multi-model specialist network
 - [ ] Extension catalogue and signing / trust metadata
 
