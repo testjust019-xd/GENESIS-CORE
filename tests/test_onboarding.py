@@ -37,3 +37,30 @@ def test_resource_profile_warns_about_low_disk():
         "cpu_logical": 8, "disk_free_bytes": GIB,
     })
     assert any("disque" in note for note in profile["notes"])
+
+
+def test_pull_ollama_model_streams_progress(monkeypatch):
+    import json
+    from genesis_core.onboarding import pull_ollama_model
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return False
+        def __iter__(self):
+            yield (json.dumps({"status": "pulling", "completed": 50, "total": 100}) + "\\n").encode()
+            yield (json.dumps({"status": "success"}) + "\\n").encode()
+
+    captured = {}
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["payload"] = json.loads(request.data)
+        return FakeResponse()
+
+    monkeypatch.setattr("genesis_core.onboarding.urlopen", fake_urlopen)
+    events = []
+    pull_ollama_model("http://127.0.0.1:11434", "gemma3:1b", events.append)
+    assert captured["url"].endswith("/api/pull")
+    assert captured["payload"]["name"] == "gemma3:1b"
+    assert len(events) == 2
