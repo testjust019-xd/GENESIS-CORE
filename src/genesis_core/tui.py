@@ -9,6 +9,7 @@ from pathlib import Path
 from genesis_core.agent import AgentRuntime, ModelError
 from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
+from genesis_core.mission_engine import MissionEngine, MissionEngineError
 from genesis_core.state import StateStore
 from genesis_core.tools import ApprovalStore, PermissionManager, ToolExecutor, build_core_registry
 
@@ -30,6 +31,7 @@ def run_tui() -> int:
     tool_registry = build_core_registry(genesis_home / "workspace")
     tool_executor = ToolExecutor(tool_registry, PermissionManager(), approvals)
     agent = AgentRuntime(store=store, tool_executor=tool_executor)
+    mission_engine = MissionEngine(store, missions, agent)
     current = None
     sessions = store.list_sessions(limit=1)
     if sessions:
@@ -95,6 +97,9 @@ def run_tui() -> int:
                 "  /missions          List missions\n"
                 "  /mission new <title>  Create a mission\n"
                 "  /mission status <id> <status>  Update mission status\n"
+                "  /mission plan <id>  Generate a task plan\n"
+                "  /mission run <id>   Execute the next task\n"
+                "  /mission tasks <id> Show mission tasks\n"
                 "  /help              Show this help\n"
                 "  /quit              Exit\n"
             )
@@ -174,9 +179,26 @@ def run_tui() -> int:
                 elif len(args) == 3 and args[0] == "status":
                     mission = missions.set_status(args[1], args[2])
                     print(f"Mission {mission['id']} is now {mission['status']}.")
+                elif len(args) == 2 and args[0] == "plan":
+                    result = mission_engine.plan(args[1])
+                    print(f"Plan ready: {len(result['tasks'])} task(s).")
+                    for task in result["tasks"]:
+                        print(f"  {task['position']}. [{task['status']}] {task['title']}")
+                elif len(args) == 2 and args[0] == "run":
+                    result = mission_engine.run_next(args[1])
+                    if result.get("task"):
+                        print(f"Task {result['task']['position']}: {result['task']['status']}")
+                        print(result["task"]["result"])
+                    else:
+                        print(f"Mission status: {result['mission']['status']}")
+                elif len(args) == 2 and args[0] == "tasks":
+                    for task in missions.list_tasks(args[1]):
+                        print(f"  {task['position']}. [{task['status']}] {task['title']}")
+                        if task["result"]:
+                            print(f"     {task['result'][:240]}")
                 else:
-                    print("Usage: /mission new <title> | /mission status <id> <status>")
-            except (MissionError, KeyError) as exc:
+                    print("Usage: /mission new <title> | /mission plan|run|tasks <id> | /mission status <id> <status>")
+            except (MissionError, MissionEngineError, KeyError, ModelError) as exc:
                 print(f"Mission error: {exc}")
         else:
             print(f"Unknown command: {command}. Type /help.")
