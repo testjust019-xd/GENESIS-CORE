@@ -276,3 +276,37 @@ def test_mission_planning_without_multi_agent_keeps_legacy_single_pass(tmp_path)
     assert result["specialists"] == []
     assert len(adapter.calls) == 1
 
+
+def test_adaptive_replanning_uses_analyst_and_planner_specialists(tmp_path):
+    from genesis_core.multi_agent import MultiAgentEngine
+
+    state = StateStore(tmp_path / "genesis.db")
+    missions = MissionStore(state)
+    mission = missions.create("Specialist replan", "Prepare a report.")
+    session = state.create_session("Mission: Specialist replan")
+    tasks = missions.save_plan(mission["id"], session["id"], [
+        {"title": "Blocked access", "instructions": "Access unavailable data."}
+    ])
+    missions.set_status(mission["id"], "running")
+    missions.set_task_status(tasks[0]["id"], "blocked", "The data source is unavailable.")
+    missions.set_status(mission["id"], "blocked")
+    revised_json = json.dumps({
+        "summary": "Use accessible sources",
+        "success_criteria": ["Report documents limitations"],
+        "assumptions": [],
+        "risks": ["Some data is unavailable"],
+        "tasks": [{"title": "Use public data", "instructions": "Use verified public sources."}],
+    })
+    adapter = ScriptedAdapter(["Identify a public alternative.", revised_json])
+    agent = AgentRuntime(store=state, adapter=adapter)
+    engine = MissionEngine(
+        state, missions, agent, multi_agent=MultiAgentEngine(state, adapter=adapter)
+    )
+
+    result = engine.replan(mission["id"], reason="Avoid unavailable data.")
+
+    assert result["replanned"] is True
+    assert result["specialists"] == ["analyst", "planner"]
+    assert result["specialist_run_id"]
+    assert len(adapter.calls) == 2
+    assert "public alternative" in adapter.calls[1][1]["content"]
