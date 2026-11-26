@@ -89,7 +89,8 @@ See [docs/INTERFACES.md](docs/INTERFACES.md) for the TUI/Studio contract and [do
 | Mission Control | Persistent goals, task plans, step results and resumable execution | Initial |
 | Memory Engine | Provenance-aware records, retrieval, verified mission capture and user-reviewed conversation extraction | Initial |
 | Knowledge Engine | Local document ingestion, chunking, SQLite full-text search and source-linked agent context | Initial |
-| Research Engine | Search, source capture and human review | Initial |\n| Skills Engine | Declarative skills, versioning and human-reviewed activation | Initial |
+| Research Engine | Search, source capture and human review | Initial |
+| Skills Engine | Declarative skills, versioning and human-reviewed activation | Initial |
 | Tool System | Schema-validated tools, workspace confinement, approval queue and agent integration | Initial foundation |
 | Multimodal | Image, audio, video and document pipelines | Planned |
 | Skill & Evaluation | Practice, competencies and repeatable benchmarks | Planned |
