@@ -10,6 +10,7 @@ from genesis_core.agent import AgentRuntime, ModelError
 from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
 from genesis_core.mission_engine import MissionEngine, MissionEngineError
+from genesis_core.memory import MemoryError, MemoryStore
 from genesis_core.state import StateStore
 from genesis_core.tools import ApprovalStore, PermissionManager, ToolExecutor, build_core_registry
 
@@ -32,6 +33,7 @@ def run_tui() -> int:
     tool_executor = ToolExecutor(tool_registry, PermissionManager(), approvals)
     agent = AgentRuntime(store=store, tool_executor=tool_executor)
     mission_engine = MissionEngine(store, missions, agent)
+    memories = MemoryStore(store)
     current = None
     sessions = store.list_sessions(limit=1)
     if sessions:
@@ -94,6 +96,10 @@ def run_tui() -> int:
                 "  /tools             List available agent tools\n"
                 "  /approvals         List pending tool approvals\n"
                 "  /approval <id> approve|reject  Decide a pending approval\n"
+                "  /memory list [type]  List active memories\n"
+                "  /memory search <text> Search active memories\n"
+                "  /memory add <type> <text> Save an explicit memory\n"
+                "  /memory off|delete <id> Deactivate or delete a memory\n"
                 "  /missions          List missions\n"
                 "  /mission new <title>  Create a mission\n"
                 "  /mission status <id> <status>  Update mission status\n"
@@ -165,6 +171,28 @@ def run_tui() -> int:
                     print(f"Approval {item['id']}: {item['status']}.")
                 except Exception as exc:
                     print(f"Approval error: {exc}")
+        elif command == "/memory":
+            try:
+                if args and args[0] == "add" and len(args) >= 3:
+                    item = memories.add(args[1], " ".join(args[2:]), source_type="user")
+                    print(f"Saved {item['memory_type']} memory: {item['id']}")
+                elif args and args[0] == "list":
+                    items = memories.list(memory_type=args[1] if len(args) > 1 else None)
+                    for item in items:
+                        print(f"{item['id']} [{item['memory_type']}] ({item['confidence']:.2f}) {item['content']}")
+                elif args and args[0] == "search" and len(args) >= 2:
+                    for item in memories.search(" ".join(args[1:])):
+                        print(f"{item['id']} [{item['memory_type']}] {item['content']}")
+                elif len(args) == 2 and args[0] == "off":
+                    memories.set_status(args[1], "inactive")
+                    print(f"Memory {args[1]} deactivated.")
+                elif len(args) == 2 and args[0] == "delete":
+                    memories.delete(args[1])
+                    print(f"Memory {args[1]} deleted.")
+                else:
+                    print("Usage: /memory list [type] | search <text> | add <episodic|semantic|procedural> <text> | off|delete <id>")
+            except (MemoryError, KeyError) as exc:
+                print(f"Memory error: {exc}")
         elif command == "/missions":
             for mission in missions.list():
                 print(
