@@ -234,8 +234,15 @@ class MissionStore:
             ).fetchall()
             if not any(row["status"] == "blocked" for row in rows):
                 raise MissionError("There is no blocked task to replan.")
-            snapshot = {"tasks": [dict(row) for row in rows], "metadata": metadata}
-            self._save_revision(db, mission_id, reason, snapshot)
+            previous_revision = db.execute(
+                "SELECT plan_json FROM mission_plan_revisions WHERE mission_id=? "
+                "ORDER BY version DESC LIMIT 1", (mission_id,)
+            ).fetchone()
+            previous_metadata = (
+                json.loads(previous_revision["plan_json"]).get("metadata", {})
+                if previous_revision else {}
+            )
+            previous_tasks = [dict(row) for row in rows]
             db.execute(
                 "DELETE FROM mission_tasks WHERE mission_id=? AND status!='completed'",
                 (mission_id,),
@@ -253,6 +260,10 @@ class MissionStore:
                     (uuid.uuid4().hex[:12], mission_id, next_position + offset,
                      task["title"], task["instructions"], now, now),
                 )
+            self._save_revision(db, mission_id, reason, {
+                "tasks": tasks, "metadata": metadata,
+                "supersedes": {"tasks": previous_tasks, "metadata": previous_metadata},
+            })
             db.execute("UPDATE missions SET updated_at=? WHERE id=?", (now, mission_id))
         return self.list_tasks(mission_id)
 
