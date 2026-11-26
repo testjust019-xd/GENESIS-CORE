@@ -196,6 +196,26 @@ class ApprovalStore:
                 ).fetchall()
         return [dict(row) for row in rows]
 
+    def find_approved(self, tool_name: str, arguments: dict[str, Any]) -> str | None:
+        """Find a one-time approval matching this exact tool request."""
+        encoded = json.dumps(arguments, sort_keys=True)
+        with sqlite3.connect(self.database_path) as db:
+            row = db.execute(
+                "SELECT id FROM tool_approvals WHERE tool_name = ? AND arguments = ? "
+                "AND status = 'approved' ORDER BY created_at LIMIT 1",
+                (tool_name, encoded),
+            ).fetchone()
+        return row[0] if row else None
+
+    def mark_used(self, approval_id: str) -> None:
+        with sqlite3.connect(self.database_path) as db:
+            cursor = db.execute(
+                "UPDATE tool_approvals SET status = 'used', updated_at = ? "
+                "WHERE id = ? AND status = 'approved'",
+                (self._now(), approval_id),
+            )
+            if cursor.rowcount != 1:
+                raise ToolError("Approval is no longer available for use.")
     def decide(self, approval_id: str, approved: bool) -> dict[str, Any]:
         current = self.get(approval_id)
         if current is None:
@@ -247,6 +267,8 @@ class ToolExecutor:
             raise
         except Exception as exc:
             raise ToolError(f"Tool '{name}' failed: {exc}") from exc
+        if decision.action == "approval_required" and approval_id:
+            self.approvals.mark_used(approval_id)
         return ToolResult(name, "completed", output=output)
 
 
