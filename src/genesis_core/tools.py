@@ -198,14 +198,16 @@ class ApprovalStore:
 
     def find_approved(self, tool_name: str, arguments: dict[str, Any]) -> str | None:
         """Find a one-time approval matching this exact tool request."""
-        encoded = json.dumps(arguments, sort_keys=True)
         with sqlite3.connect(self.database_path) as db:
-            row = db.execute(
-                "SELECT id FROM tool_approvals WHERE tool_name = ? AND arguments = ? "
-                "AND status = 'approved' ORDER BY created_at LIMIT 1",
-                (tool_name, encoded),
-            ).fetchone()
-        return row[0] if row else None
+            rows = db.execute(
+                "SELECT id, arguments FROM tool_approvals WHERE tool_name = ? "
+                "AND status = 'approved' ORDER BY created_at",
+                (tool_name,),
+            ).fetchall()
+        for approval_id, encoded in rows:
+            if json.loads(encoded) == arguments:
+                return approval_id
+        return None
 
     def mark_used(self, approval_id: str) -> None:
         with sqlite3.connect(self.database_path) as db:
