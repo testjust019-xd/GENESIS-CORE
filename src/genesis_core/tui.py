@@ -102,7 +102,7 @@ def run_tui() -> int:
                 "  /memory search <text> Search active memories\n"
                 "  /memory add <type> <text> Save an explicit memory\n"
                 "  /memory off|delete <id> Deactivate or delete a memory\n"
-                "  /knowledge add <path> Import a UTF-8 .txt/.md/.rst file\n"
+                "  /knowledge add <path> Import UTF-8 text or selectable-text PDF\n"
                 "  /knowledge search <query> Search indexed documents\n"
                 "  /knowledge list|delete <id> Manage indexed documents\n"
                 "  /missions          List missions\n"
