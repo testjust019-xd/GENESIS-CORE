@@ -139,3 +139,25 @@ def test_invalid_observer_output_fails_closed(tmp_path):
 
     assert result["task"]["status"] == "blocked"
     assert result["mission"]["status"] == "blocked"
+
+def test_interrupted_running_task_can_be_resumed(tmp_path):
+    state = StateStore(tmp_path / "genesis.db")
+    missions = MissionStore(state)
+    mission = missions.create("Resume interrupted task")
+    session = state.create_session("Mission: Resume interrupted task")
+    tasks = missions.save_plan(mission["id"], session["id"], [
+        {"title": "Continue work", "instructions": "Continue the interrupted step."}
+    ])
+    missions.set_status(mission["id"], "running")
+    missions.set_task_status(tasks[0]["id"], "running")
+    adapter = ScriptedAdapter([
+        "The remaining work is complete.",
+        json.dumps({"status": "completed", "summary": "The remaining work was verified."}),
+    ])
+    engine = MissionEngine(state, missions, AgentRuntime(store=state, adapter=adapter))
+
+    result = engine.run_next(mission["id"])
+
+    assert result["task"]["status"] == "completed"
+    assert "interrupted during a previous run" in adapter.calls[0][-1]["content"]
+    assert result["mission"]["status"] == "completed"
