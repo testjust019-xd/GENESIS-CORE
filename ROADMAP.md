@@ -60,7 +60,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Agent context grounding from local knowledge with untrusted-source boundaries
 - [x] TUI and Studio document ingestion, search and deletion
 - [ ] Embedding-based semantic retrieval and hybrid ranking
-- [ ] PDF / Office document extraction and OCR
+- [x] Optional selectable-text PDF extraction (initial)\n- [ ] Office document extraction and scanned-PDF OCR
 - [ ] Knowledge graph, entity links and contradiction tracking
 
 ## Milestone 4 — Research and multimodal tools
