@@ -67,3 +67,30 @@ def test_agent_injects_relevant_managed_memory(tmp_path):
     assert len(recalled) == 1
     assert "stored in SQLite" in recalled[0]
     assert "manual note" in recalled[0]
+
+
+def test_agent_injects_relevant_local_knowledge_with_citation(tmp_path):
+    from genesis_core.knowledge import KnowledgeStore
+
+    store = StateStore(tmp_path / "genesis.db")
+    session = store.create_session()
+    knowledge = KnowledgeStore(store)
+    knowledge.ingest_text(
+        "GENESIS architecture",
+        "GENESIS uses SQLite to store persistent local conversation state.",
+        "docs/architecture.md",
+    )
+    adapter = FakeAdapter()
+
+    AgentRuntime(store=store, adapter=adapter, knowledge_store=knowledge).chat(
+        session["id"], "How does GENESIS store local conversation state?"
+    )
+
+    recalled = [
+        m["content"] for m in adapter.seen_messages
+        if "RETRIEVED GENESIS KNOWLEDGE" in m["content"]
+    ]
+    assert len(recalled) == 1
+    assert "SQLite" in recalled[0]
+    assert "docs/architecture.md" in recalled[0]
+    assert "chunk" in recalled[0]
