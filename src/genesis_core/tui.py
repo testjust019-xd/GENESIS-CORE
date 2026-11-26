@@ -13,6 +13,7 @@ from genesis_core.mission_engine import MissionEngine, MissionEngineError
 from genesis_core.memory import MemoryError, MemoryStore
 from genesis_core.conversation_memory import ConversationMemoryEngine, ConversationMemoryError
 from genesis_core.knowledge import KnowledgeError, KnowledgeStore
+from genesis_core.research import ResearchEngine, ResearchError
 from genesis_core.state import StateStore
 from genesis_core.tools import ApprovalStore, PermissionManager, ToolExecutor, build_core_registry
 
@@ -38,6 +39,7 @@ def run_tui() -> int:
     memories = MemoryStore(store)
     conversation_memory = ConversationMemoryEngine(store, memories)
     knowledge = KnowledgeStore(store)
+    research = ResearchEngine(store, knowledge)
     current = None
     sessions = store.list_sessions(limit=1)
     if sessions:
@@ -111,6 +113,9 @@ def run_tui() -> int:
                 "  /knowledge add <path> Import UTF-8 text or selectable-text PDF\n"
                 "  /knowledge search <query> Search indexed documents\n"
                 "  /knowledge list|delete <id> Manage indexed documents\n"
+                "  /research search <query> Search web or local knowledge\n"
+                "  /research sources [pending|approved|rejected] List saved sources\n"
+                "  /research review <id> approve|reject Review a source\n"
                 "  /missions          List missions\n"
                 "  /mission new <title>  Create a mission\n"
                 "  /mission status <id> <status>  Update mission status\n"
@@ -221,6 +226,32 @@ def run_tui() -> int:
                     print("Usage: /memory list [type] | search <text> | add <episodic|semantic|procedural> <text> | mission <id> | extract [session-id] | candidates [session-id] | candidate <id> accept|reject | off|delete <id>")
             except (MemoryError, ConversationMemoryError, KeyError, ModelError) as exc:
                 print(f"Memory error: {exc}")
+        elif command == "/research":
+            try:
+                if len(args) >= 2 and args[0] == "search":
+                    result = research.search(" ".join(args[1:]))
+                    print(f"Research {result['id']} · {result['mode']} · {result['source_count']} source(s)")
+                    print(result["notice"])
+                    for source in result["sources"]:
+                        print(f"  [{source['review_status']}] {source['title']}")
+                        print(f"    {source['url']}")
+                        if source["snippet"]:
+                            print(f"    {source['snippet'][:260]}")
+                elif args and args[0] == "sources":
+                    status = args[1] if len(args) > 1 else None
+                    for source in research.list_sources(review_status=status):
+                        print(f"[{source['review_status']}] {source['id']} — {source['title']}")
+                        print(f"  {source['url']}")
+                elif len(args) == 3 and args[0] == "review":
+                    decision = {"approve": "approved", "reject": "rejected"}.get(args[2])
+                    if not decision:
+                        raise ResearchError("Use approve or reject.")
+                    source = research.review_source(args[1], decision)
+                    print(f"Source {source['id']} is now {source['review_status']}.")
+                else:
+                    print("Usage: /research search <query> | sources [pending|approved|rejected] | review <id> approve|reject")
+            except (ResearchError, KeyError) as exc:
+                print(f"Research error: {exc}")
         elif command == "/knowledge":
             try:
                 if len(args) >= 2 and args[0] == "add":
