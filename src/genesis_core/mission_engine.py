@@ -161,10 +161,13 @@ class MissionEngine:
             event.get("status") == "approval_required" for event in reply.activity
         )
         output = reply.assistant_message["content"]
-        observation = (
-            {"status": "blocked", "summary": "An action is waiting for user approval."}
-            if approval_needed else self._observe_task(mission, task, output)
-        )
+        if approval_needed:
+            observation = {"status": "blocked", "summary": "An action is waiting for user approval."}
+        else:
+            try:
+                observation = self._observe_task(mission, task, output)
+            except ModelError as exc:
+                observation = {"status": "blocked", "summary": f"Observer unavailable; review required: {exc}"}
         task_status = observation["status"]
         stored_result = output + "\\n\\nObserver: " + observation["summary"]
         self.missions.set_task_status(task["id"], task_status, result=stored_result)
