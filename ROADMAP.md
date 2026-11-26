@@ -32,7 +32,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Initial fail-closed permission profiles and persistent approval queue (write/system actions remain gated)
 - [x] Agent tool routing with bounded steps, repeated-call guard and observer review
 - [x] Approval queue exposed through Studio API and TUI
-- [ ] Permission profiles exposed in Studio/TUI and approval management UI
+- [ ] Configurable permission profiles and approval management UI
 - [ ] Timeouts, budgets, retries and audit log
 - [ ] Structured activity events shared by TUI and Studio
 
