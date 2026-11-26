@@ -133,7 +133,7 @@ class MultiAgentEngine:
                     {"role": "system", "content": (
                         f"You are the GENESIS {spec['label']} specialist. "
                         "You are one role in a sequential collaboration, not an independent model. "
-                        "Return concise, structured plain text. Respect all GENESIS safety and "
+                        "Follow the requested output format exactly; when JSON is requested, return valid JSON only. Respect all GENESIS safety and "
                         "permission boundaries."
                     )},
                     {"role": "user", "content": json.dumps(prompt, ensure_ascii=False)},
