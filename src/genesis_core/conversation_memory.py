@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from genesis_core.adapters import ChatAdapter, create_chat_adapter
-from genesis_core.memory import MEMORY_TYPES, MemoryError, MemoryStore
+from genesis_core.memory import MEMORY_TYPES, MemoryStore
 from genesis_core.state import StateStore
 
 
