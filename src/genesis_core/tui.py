@@ -124,6 +124,8 @@ def run_tui() -> int:
                 "  /mission plan <id>  Generate a task plan\n"
                 "  /mission run <id>   Execute the next task\n"
                 "  /mission tasks <id> Show mission tasks\n"
+                "  /mission replan <id> [reason] Propose a revised plan after a blocker\n"
+                "  /mission history <id> Show saved plan revisions\n"
                 "  /help              Show this help\n"
                 "  /quit              Exit\n"
             )
@@ -339,13 +341,22 @@ def run_tui() -> int:
                         print(result["task"]["result"])
                     else:
                         print(f"Mission status: {result['mission']['status']}")
+                elif len(args) >= 2 and args[0] == "replan":
+                    result = mission_engine.replan(args[1], " ".join(args[2:]))
+                    print(f"Revised plan proposed. Preserved {result['preserved_completed']} completed task(s).")
+                    for task in result["tasks"]:
+                        print(f"  {task['position']}. [{task['status']}] {task['title']}")
+                elif len(args) == 2 and args[0] == "history":
+                    for revision in mission_engine.plan_history(args[1]):
+                        print(f"Plan v{revision['version']} · {revision['created_at']} · {revision['reason']}")
+                        print(json.dumps(revision["plan"].get("metadata", {}), ensure_ascii=False))
                 elif len(args) == 2 and args[0] == "tasks":
                     for task in missions.list_tasks(args[1]):
                         print(f"  {task['position']}. [{task['status']}] {task['title']}")
                         if task["result"]:
                             print(f"     {task['result'][:240]}")
                 else:
-                    print("Usage: /mission new <title> | /mission plan|run|tasks <id> | /mission status <id> <status>")
+                    print("Usage: /mission new <title> | plan|run|tasks|history <id> | replan <id> [reason] | status <id> <status>")
             except (MissionError, MissionEngineError, KeyError, ModelError) as exc:
                 print(f"Mission error: {exc}")
         else:

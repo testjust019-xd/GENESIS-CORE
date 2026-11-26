@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import uuid
 from contextlib import contextmanager
@@ -82,6 +83,17 @@ class MissionStore:
                     UNIQUE(mission_id, position)
                 )
             """)
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS mission_plan_revisions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    mission_id TEXT NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+                    version INTEGER NOT NULL,
+                    reason TEXT NOT NULL,
+                    plan_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    UNIQUE(mission_id, version)
+                )
+            """)
             db.execute(
                 "CREATE INDEX IF NOT EXISTS idx_mission_tasks_status "
                 "ON mission_tasks(mission_id, status, position)"
@@ -152,7 +164,8 @@ class MissionStore:
         return self.get(mission_id) or current
 
     def save_plan(
-        self, mission_id: str, session_id: str, tasks: list[dict[str, str]]
+        self, mission_id: str, session_id: str, tasks: list[dict[str, str]],
+        metadata: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         if not tasks or len(tasks) > 8:
             raise MissionError("A mission plan must contain between 1 and 8 tasks.")
@@ -169,6 +182,7 @@ class MissionStore:
                 "UPDATE missions SET session_id = ?, updated_at = ? WHERE id = ?",
                 (session_id, now, mission_id),
             )
+            self._save_revision(db, mission_id, "initial plan", {"tasks": tasks, "metadata": metadata or {}})
             for position, task in enumerate(tasks, start=1):
                 db.execute(
                     "INSERT INTO mission_tasks "
@@ -177,6 +191,80 @@ class MissionStore:
                     (uuid.uuid4().hex[:12], mission_id, position,
                      task["title"], task["instructions"], now, now),
                 )
+        return self.list_tasks(mission_id)
+
+    def _save_revision(self, db: sqlite3.Connection, mission_id: str,
+                       reason: str, plan: dict[str, Any]) -> int:
+        version = db.execute(
+            "SELECT COALESCE(MAX(version), 0) + 1 FROM mission_plan_revisions WHERE mission_id=?",
+            (mission_id,),
+        ).fetchone()[0]
+        db.execute(
+            "INSERT INTO mission_plan_revisions(mission_id, version, reason, plan_json, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (mission_id, version, reason, json.dumps(plan, ensure_ascii=False), self._now()),
+        )
+        return version
+
+    def plan_history(self, mission_id: str) -> list[dict[str, Any]]:
+        with self._connect() as db:
+            if not db.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone():
+                raise KeyError(mission_id)
+            rows = db.execute(
+                "SELECT version, reason, plan_json, created_at FROM mission_plan_revisions "
+                "WHERE mission_id=? ORDER BY version", (mission_id,)
+            ).fetchall()
+        return [{
+            "version": row["version"], "reason": row["reason"],
+            "plan": json.loads(row["plan_json"]), "created_at": row["created_at"],
+        } for row in rows]
+
+    def replan_remaining(self, mission_id: str, tasks: list[dict[str, str]],
+                         metadata: dict[str, Any], reason: str) -> list[dict[str, Any]]:
+        if not tasks or len(tasks) > 8:
+            raise MissionError("A revised plan must contain between 1 and 8 remaining tasks.")
+        with self._connect() as db:
+            mission = db.execute("SELECT status FROM missions WHERE id=?", (mission_id,)).fetchone()
+            if mission is None:
+                raise KeyError(mission_id)
+            if mission["status"] != "blocked":
+                raise MissionError("Only blocked missions can be replanned.")
+            rows = db.execute(
+                "SELECT * FROM mission_tasks WHERE mission_id=? ORDER BY position", (mission_id,)
+            ).fetchall()
+            if not any(row["status"] == "blocked" for row in rows):
+                raise MissionError("There is no blocked task to replan.")
+            previous_revision = db.execute(
+                "SELECT plan_json FROM mission_plan_revisions WHERE mission_id=? "
+                "ORDER BY version DESC LIMIT 1", (mission_id,)
+            ).fetchone()
+            previous_metadata = (
+                json.loads(previous_revision["plan_json"]).get("metadata", {})
+                if previous_revision else {}
+            )
+            previous_tasks = [dict(row) for row in rows]
+            db.execute(
+                "DELETE FROM mission_tasks WHERE mission_id=? AND status!='completed'",
+                (mission_id,),
+            )
+            next_position = db.execute(
+                "SELECT COALESCE(MAX(position), 0) + 1 FROM mission_tasks WHERE mission_id=?",
+                (mission_id,),
+            ).fetchone()[0]
+            now = self._now()
+            for offset, task in enumerate(tasks):
+                db.execute(
+                    "INSERT INTO mission_tasks "
+                    "(id, mission_id, position, title, instructions, status, result, created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, 'planned', '', ?, ?)",
+                    (uuid.uuid4().hex[:12], mission_id, next_position + offset,
+                     task["title"], task["instructions"], now, now),
+                )
+            self._save_revision(db, mission_id, reason, {
+                "tasks": tasks, "metadata": metadata,
+                "supersedes": {"tasks": previous_tasks, "metadata": previous_metadata},
+            })
+            db.execute("UPDATE missions SET updated_at=? WHERE id=?", (now, mission_id))
         return self.list_tasks(mission_id)
 
     def list_tasks(self, mission_id: str) -> list[dict[str, Any]]:

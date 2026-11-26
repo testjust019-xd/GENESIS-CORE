@@ -29,6 +29,11 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Structured mission plans persisted as ordered tasks
 - [x] Step-by-step mission execution with stored results and resume after interruption
 - [x] Bounded planner / executor / observer loop over chat adapters (initial)
+- [x] Structured mission plans with summaries, success criteria, assumptions and risks (initial)
+- [x] Adaptive replanning after blocked tasks while preserving completed work (initial)
+- [x] Persistent mission plan revision history (initial)
+- [ ] Dependency-aware scheduling and parallel-safe task groups
+- [ ] Plan quality scoring and outcome-based evaluation
 - [x] Initial tool registry with JSON-schema subset validation and duplicate protection
 - [x] Initial read-only workspace tools (directory listing and UTF-8 file reading, path-confined)
 - [x] Initial fail-closed permission profiles and persistent approval queue (write/system actions remain gated)
