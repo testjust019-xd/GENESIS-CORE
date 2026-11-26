@@ -256,6 +256,11 @@ class ResearchStore:
                     page_text TEXT NOT NULL DEFAULT '', page_fetched_at TEXT
                 )
             """)
+            columns = {row[1] for row in db.execute("PRAGMA table_info(research_sources)")}
+            if "page_text" not in columns:
+                db.execute("ALTER TABLE research_sources ADD COLUMN page_text TEXT NOT NULL DEFAULT ''")
+            if "page_fetched_at" not in columns:
+                db.execute("ALTER TABLE research_sources ADD COLUMN page_fetched_at TEXT")
             db.execute("""
                 CREATE TABLE IF NOT EXISTS research_run_sources (
                     run_id TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
