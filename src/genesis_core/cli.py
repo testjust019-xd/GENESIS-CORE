@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from genesis_core import __version__
+from genesis_core.config import read_settings, set_model
 from genesis_core.hardware import format_bytes, inspect_hardware
 from genesis_core.models import discover_runtimes
 
@@ -81,6 +82,13 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("doctor", help="inspect host resources and runtime environment")
     subparsers.add_parser("init", help="create the local GENESIS data directory")
     subparsers.add_parser("models", help="discover local model runtimes and available models")
+    model = subparsers.add_parser("model", help="view or configure the primary model")
+    model_sub = model.add_subparsers(dest="model_action")
+    model_sub.add_parser("show", help="show the selected primary model")
+    model_set = model_sub.add_parser("set", help="select the primary model")
+    model_set.add_argument("provider", choices=["ollama", "llama_cpp", "lm_studio"])
+    model_set.add_argument("name", help="model identifier reported by the provider")
+    model_set.add_argument("--url", help="custom provider base URL")
     subparsers.add_parser("tui", help="open the interactive GENESIS terminal workspace")
 
     serve = subparsers.add_parser(
@@ -105,6 +113,23 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "init":
         return _init()
+    if args.command == "model":
+        if args.model_action == "set":
+            try:
+                path = set_model(args.provider, args.name, args.url)
+            except ValueError as exc:
+                print(f"Configuration error: {exc}", file=sys.stderr)
+                return 2
+            print(f"Primary model saved to {path}: {args.provider}/{args.name}")
+            return 0
+        settings = read_settings()
+        selected = settings.get("model")
+        if selected:
+            print(f"Primary model: {selected.get('provider')}/{selected.get('name')}")
+            print(f"Base URL: {selected.get('base_url', 'provider default')}")
+        else:
+            print("No primary model selected. GENESIS will auto-detect a local model.")
+        return 0
     if args.command == "models":
         print("GENESIS CORE — LOCAL MODEL RUNTIMES")
         for runtime in discover_runtimes():
