@@ -8,7 +8,7 @@ GENESIS CORE is its own agent environment. Local runtimes such as Ollama, llama.
 
 ## Project status
 
-**Early foundation / v0.1.0-dev.** The repository now includes two first-party interface foundations: an interactive terminal workspace (**GENESIS TUI**) and a graphical local workspace (**GENESIS Studio**). Both use the same SQLite-backed conversation store. Model discovery and hardware inspection are available. The agent inference loop, provider chat adapters, tool execution, long-term memory, research and training are not implemented yet.
+**Early foundation / v0.1.0-dev.** The repository includes two first-party interfaces (**GENESIS TUI** and **GENESIS Studio**), a shared SQLite conversation store, local runtime discovery, initial chat adapters for Ollama and OpenAI-compatible local servers, and a first agent loop. The agent can now send conversation context to a selected local model and persist its reply. Tool execution, planning, long-term memory, research, and training remain future milestones. Automated tests and CI have been added; their first CI run must still be checked.
 
 ## Principles
 
@@ -24,7 +24,7 @@ GENESIS CORE is its own agent environment. Local runtimes such as Ollama, llama.
 
 - Linux first (Ubuntu/Debian are the initial targets)
 - Python 3.11+
-- A local model runtime is optional for the current interface foundation
+- A local model runtime is required for actual AI replies; the interfaces and diagnostics can run without one
 
 ## Install from source
 
@@ -34,7 +34,7 @@ cd GENESIS-CORE
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -e ".[web]"
+pip install -e ".[web,dev]"
 ```
 
 ## Launch GENESIS
@@ -57,12 +57,14 @@ Other commands:
 ```bash
 genesis doctor
 genesis models
+genesis model show
+genesis model set ollama llama3.2
 genesis --help
 ```
 
 The Studio server binds to `127.0.0.1` by default. Runtime discovery checks the default local endpoints for Ollama, llama.cpp and LM Studio. URLs can be overridden with `GENESIS_OLLAMA_URL`, `GENESIS_LLAMA_CPP_URL` and `GENESIS_LM_STUDIO_URL`.
 
-**Current limitation:** messages are persisted and synchronized between interfaces, but no model generates replies yet. The UI explicitly reports this instead of pretending an agent is running.
+**Current limitation:** the first agent loop supports direct chat only. It does not yet plan multi-step missions, call tools, browse the web, or perform background learning. If no local model is reachable, GENESIS reports a provider error rather than simulating an answer.
 
 ## Architecture
 
@@ -75,8 +77,8 @@ See [docs/INTERFACES.md](docs/INTERFACES.md) for the TUI/Studio contract and [do
 | GENESIS Studio | Graphical local workspace and API | Initial |
 | Hardware Monitor | CPU, RAM, disk and platform detection | Initial |
 | Model Discovery | Detect local runtimes and models | Initial |
-| Model Adapters | Chat/completion adapters for local and remote models | Planned |
-| Agent Runtime | Planning, tool selection and execution loop | Planned |
+| Model Adapters | Ollama and OpenAI-compatible local chat adapters | Initial |
+| Agent Runtime | Context-aware direct chat loop; planner and tools pending | Initial |
 | Memory | Episodic and semantic knowledge | Planned |
 | Research Engine | Search, source capture and verification | Planned |
 | Tool System | Permissioned tools and extensions | Planned |
