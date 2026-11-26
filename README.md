@@ -8,7 +8,7 @@ GENESIS CORE is its own agent environment. Local runtimes such as Ollama, llama.
 
 ## Project status
 
-**Early foundation / v0.1.0-dev.** The repository includes two first-party interfaces (**GENESIS TUI** and **GENESIS Studio**), a shared SQLite conversation store, local runtime discovery, initial chat adapters for Ollama and OpenAI-compatible local servers, and a first agent loop. The agent can now send conversation context to a selected local model and persist its reply. Tool execution, planning, long-term memory, research, and training remain future milestones. Automated tests and CI have been added; their first CI run must still be checked.
+**Early foundation / v0.1.0-dev.** The repository includes two first-party interfaces (**GENESIS TUI** and **GENESIS Studio**), a shared SQLite conversation store, local runtime discovery, initial chat adapters for Ollama and OpenAI-compatible local servers, and a first agent loop. The agent can now send conversation context to a selected local model and persist its reply. Tool execution, planning, long-term memory, research, and training remain future milestones. Automated tests and CI have been added, and the initial test run passed.
 
 ## Principles
 
