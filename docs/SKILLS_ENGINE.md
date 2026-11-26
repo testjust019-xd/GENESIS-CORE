@@ -19,28 +19,28 @@ external skill code is loaded or executed.
 
 ## TUI
 
-- \`/skills list [draft|pending|active|disabled]\`
-- \`/skill create <name> | <description> | <instructions>\`
-- \`/skill submit <id>\`
-- \`/skill review <id> approve|reject\`
-- \`/skill disable <id>\`
-- \`/skill versions <id>\`
+- `/skills list [draft|pending|active|disabled]`
+- `/skill create <name> | <description> | <instructions>`
+- `/skill submit <id>`
+- `/skill review <id> approve|reject`
+- `/skill disable <id>`
+- `/skill versions <id>`
 
 The create command supplies a minimal default checklist. Studio exposes the full
 manifest fields through its API.
 
 ## API
 
-- \`GET /api/skills?status=active\`
-- \`POST /api/skills\`
-- \`GET /api/skills/{skill_id}\`
-- \`PUT /api/skills/{skill_id}\`
-- \`POST /api/skills/{skill_id}/submit\`
-- \`POST /api/skills/{skill_id}/review\`
-- \`POST /api/skills/{skill_id}/disable\`
-- \`GET /api/skills/{skill_id}/versions\`
-- \`GET /api/skills/{skill_id}/export\`
-- \`POST /api/skills/import\`
+- `GET /api/skills?status=active`
+- `POST /api/skills`
+- `GET /api/skills/{skill_id}`
+- `PUT /api/skills/{skill_id}`
+- `POST /api/skills/{skill_id}/submit`
+- `POST /api/skills/{skill_id}/review`
+- `POST /api/skills/{skill_id}/disable`
+- `GET /api/skills/{skill_id}/versions`
+- `GET /api/skills/{skill_id}/export`
+- `POST /api/skills/import`
 
 The first implementation uses lexical relevance to include up to three active
 skills in the agent context. Skills are context guidance, not guaranteed model
