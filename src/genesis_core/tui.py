@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import shlex
-import sys
-
 from genesis_core.models import discover_runtimes
 from genesis_core.state import StateStore
 
@@ -16,10 +14,6 @@ BANNER = r"""
  | |_| | |___| |\  | |___ ___) | | |___  
   \____|_____|_| \_|_____|____/___\____| 
 """
-
-
-def _short_id(value: str) -> str:
-    return value[:12]
 
 
 def run_tui() -> int:
