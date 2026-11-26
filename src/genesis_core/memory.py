@@ -135,7 +135,7 @@ class MemoryStore:
             result = task["result"].strip()
             # Keep the persisted observer decision alongside the executor result.
             lines.append(f"- {task['title']}: {result[:700] or 'Completed; no result text was stored.'}")
-        content = "\\n".join(lines)[:4000]
+        content = "\n".join(lines)[:4000]
         return self.add(
             "episodic", content, source_type="mission", source_ref=source_ref,
             confidence=0.95,
