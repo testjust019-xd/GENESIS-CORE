@@ -162,6 +162,16 @@ def run_mission_step(mission_id: str) -> dict:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@app.post("/api/memories/from-mission/{mission_id}")
+def capture_mission_memory(mission_id: str) -> dict:
+    try:
+        return {"memory": memory_store.capture_completed_mission(mission_store, mission_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Mission not found") from exc
+    except MemoryError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @app.get("/api/memories")
 def list_memories(memory_type: str | None = None, status: str = "active") -> dict:
     try:
