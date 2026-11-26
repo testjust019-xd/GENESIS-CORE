@@ -20,7 +20,8 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Provider adapter and agent-loop tests pass in CI
 - [ ] Hugging Face Transformers local adapter
 - [ ] Optional remote API mentor providers and secure secret storage
-- [x] Hardware-aware first-run model recommendations and opt-in Ollama download (initial)\n- [ ] Model capability and context-window inspection
+- [x] Hardware-aware first-run model recommendations and opt-in Ollama download (initial)
+- [ ] Model capability and context-window inspection
 - [ ] Streaming responses and cancellation
 
 ## Milestone 2 — Agent runtime
