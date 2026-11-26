@@ -7,15 +7,17 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from genesis_core import __version__
-from genesis_core.agent import AgentRuntime, ModelError
+from genesis_core.agent import AgentRuntime, ModelError, build_default_tool_executor
 from genesis_core.hardware import inspect_hardware
 from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
 from genesis_core.state import StateStore
+from genesis_core.tools import ToolError
 
 app = FastAPI(title="GENESIS CORE Studio", version=__version__)
 store = StateStore()
-agent = AgentRuntime(store=store)
+tool_executor, approval_store = build_default_tool_executor(store)
+agent = AgentRuntime(store=store, tool_executor=tool_executor)
 mission_store = MissionStore(state=store)
 
 
@@ -44,7 +46,8 @@ def status() -> dict:
         "version": __version__,
         "status": "foundation",
         "interfaces": ["TUI", "Studio"],
-        "agent_runtime": "ready",
+        "agent_runtime": "planner_executor_observer",
+        "available_tools": [tool["name"] for tool in tool_executor.registry.list()],
         "hardware": inspect_hardware(),
         "model_runtimes": [runtime.to_dict() for runtime in discover_runtimes()],
     }
@@ -82,7 +85,8 @@ def add_message(session_id: str, payload: MessageInput) -> dict:
         "assistant_message": reply.assistant_message,
         "provider": reply.provider,
         "model": reply.model,
-        "agent_runtime": "ready",
+        "agent_runtime": "planner_executor_observer",
+        "activity": reply.activity,
     }
 
 
@@ -112,6 +116,26 @@ def update_mission(mission_id: str, payload: MissionStatusInput) -> dict:
         raise HTTPException(status_code=404, detail="Mission not found") from exc
     except MissionError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/approvals")
+def list_approvals() -> dict:
+    return {"approvals": approval_store.list()}
+
+
+class ApprovalDecisionInput(BaseModel):
+    decision: str
+
+
+@app.post("/api/approvals/{approval_id}")
+def decide_approval(approval_id: str, payload: ApprovalDecisionInput) -> dict:
+    if payload.decision not in {"approve", "reject"}:
+        raise HTTPException(status_code=422, detail="Decision must be approve or reject")
+    try:
+        item = approval_store.decide(approval_id, approved=payload.decision == "approve")
+        return {"approval": item}
+    except ToolError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.get("/", response_class=HTMLResponse)
