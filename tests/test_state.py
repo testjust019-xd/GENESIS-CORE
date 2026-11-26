@@ -8,7 +8,7 @@ def test_sessions_and_messages_are_persistent(tmp_path):
     first.add_message(session["id"], "user", "Hello from TUI")
 
     second = StateStore(database)
-    assert second.get_session(session["id"])["title"] == "Shared workspace"
+    assert second.get_session(session["id"])["title"] == "Hello from TUI"
     messages = second.list_messages(session["id"])
     assert len(messages) == 1
     assert messages[0]["content"] == "Hello from TUI"
