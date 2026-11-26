@@ -71,7 +71,7 @@ def pull_ollama_model(base_url: str, model: str,
                     raise RuntimeError(str(event["error"]))
                 if progress:
                     progress(event)
-    except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+    except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError, RuntimeError) as exc:
         raise RuntimeError(f"Échec du téléchargement de {model}: {exc}") from exc
 
 
@@ -169,6 +169,8 @@ def run_setup(*, input_fn: Callable[[str], str] = input, output: Any = None) -> 
 
 def run_first_start_if_needed() -> int:
     """Run onboarding once when no model has been configured."""
+    if not sys.stdin.isatty():
+        return 0
     settings = read_settings()
     if settings.get("model") or settings.get("onboarding_completed"):
         return 0
