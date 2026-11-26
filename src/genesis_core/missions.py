@@ -164,7 +164,8 @@ class MissionStore:
         return self.get(mission_id) or current
 
     def save_plan(
-        self, mission_id: str, session_id: str, tasks: list[dict[str, str]]
+        self, mission_id: str, session_id: str, tasks: list[dict[str, str]],
+        metadata: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         if not tasks or len(tasks) > 8:
             raise MissionError("A mission plan must contain between 1 and 8 tasks.")
@@ -181,7 +182,7 @@ class MissionStore:
                 "UPDATE missions SET session_id = ?, updated_at = ? WHERE id = ?",
                 (session_id, now, mission_id),
             )
-            self._save_revision(db, mission_id, "initial plan", {"tasks": tasks})
+            self._save_revision(db, mission_id, "initial plan", {"tasks": tasks, "metadata": metadata or {}})
             for position, task in enumerate(tasks, start=1):
                 db.execute(
                     "INSERT INTO mission_tasks "
