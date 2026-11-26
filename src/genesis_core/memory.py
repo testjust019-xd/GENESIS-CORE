@@ -99,6 +99,46 @@ class MemoryStore:
             )
         return item
 
+    def capture_completed_mission(self, mission_store: Any, mission_id: str) -> dict[str, Any]:
+        """Create one episodic record from a fully completed, observer-checked mission.
+
+        This is an explicit user action. It copies stored task outcomes; it does not ask
+        a model to invent a summary or promote unverified conversation claims.
+        """
+        mission = mission_store.get(mission_id)
+        if mission is None:
+            raise KeyError(mission_id)
+        if mission["status"] != "completed":
+            raise MemoryError("Only completed missions can be captured as episodic memory.")
+
+        tasks = mission_store.list_tasks(mission_id)
+        if not tasks or any(task["status"] != "completed" for task in tasks):
+            raise MemoryError("Every mission task must be completed before capture.")
+
+        source_ref = f"mission:{mission_id}"
+        with self._connect() as db:
+            existing = db.execute(
+                "SELECT * FROM memories WHERE source_type = 'mission' AND source_ref = ? "
+                "ORDER BY created_at LIMIT 1",
+                (source_ref,),
+            ).fetchone()
+        if existing:
+            return dict(existing)
+
+        lines = [f"Completed mission: {mission['title']}."]
+        if mission.get("description"):
+            lines.append(f"Objective: {mission['description']}")
+        lines.append("Verified task outcomes:")
+        for task in tasks:
+            result = task["result"].strip()
+            # Keep the persisted observer decision alongside the executor result.
+            lines.append(f"- {task['title']}: {result[:700] or 'Completed; no result text was stored.'}")
+        content = "\\n".join(lines)[:4000]
+        return self.add(
+            "episodic", content, source_type="mission", source_ref=source_ref,
+            confidence=0.95,
+        )
+
     def get(self, memory_id: str) -> dict[str, Any] | None:
         with self._connect() as db:
             row = db.execute("SELECT * FROM memories WHERE id = ?", (memory_id,)).fetchone()
