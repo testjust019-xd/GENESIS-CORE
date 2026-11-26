@@ -136,5 +136,60 @@ class ChatAdapter:
         return content.strip()
 
 
+    def stream(self, messages: list[dict[str, str]]):
+        """Yield incremental assistant text from Ollama or an OpenAI-compatible endpoint."""
+        payload = {"model": self.config.model, "messages": messages, "stream": True}
+        headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+        url = f"{self.config.base_url}/api/chat" if self.config.provider == "ollama" else (
+            f"{self.config.base_url}/v1/chat/completions"
+        )
+        if self.config.api_key and self.config.provider != "ollama":
+            headers["Authorization"] = f"Bearer {self.config.api_key}"
+        request = Request(
+            url, data=json.dumps(payload).encode("utf-8"),
+            headers=headers, method="POST",
+        )
+        emitted = False
+        try:
+            with urlopen(request, timeout=self.timeout) as response:
+                for raw_line in response:
+                    line = raw_line.decode("utf-8", errors="replace").strip()
+                    if not line:
+                        continue
+                    if self.config.provider == "ollama":
+                        try:
+                            item = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        if item.get("error"):
+                            raise ModelError(str(item["error"])[:1000])
+                        content = item.get("message", {}).get("content", "")
+                        if item.get("done"):
+                            break
+                    else:
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            item = json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
+                        choices = item.get("choices", [])
+                        delta = choices[0].get("delta", {}) if choices else {}
+                        content = delta.get("content", "") if isinstance(delta, dict) else ""
+                    if isinstance(content, str) and content:
+                        emitted = True
+                        yield content
+        except HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")[:1000]
+            raise ModelError(f"Model provider returned HTTP {exc.code}: {detail}") from exc
+        except (URLError, TimeoutError, OSError) as exc:
+            raise ModelError(f"Cannot reach model provider at {url}: {exc}") from exc
+        if not emitted:
+            raise ModelError("The model provider returned no streamed assistant text.")
+
+
 def create_chat_adapter(config: ModelConfig | None = None) -> ChatAdapter:
     return ChatAdapter(config or load_model_config())

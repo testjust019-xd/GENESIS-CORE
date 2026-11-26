@@ -6,7 +6,7 @@ import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from genesis_core.adapters import ChatAdapter, ModelError, create_chat_adapter
 from genesis_core.state import StateStore
@@ -55,6 +55,36 @@ def _decode_action(content: str) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
+def _partial_final_message(raw: str) -> str:
+    """Decode the available prefix of a streamed final-action JSON message."""
+    import re
+
+    if not re.search(r'"action"\s*:\s*"final"', raw):
+        return ""
+    match = re.search(r'"message"\s*:\s*"', raw)
+    if not match:
+        return ""
+    encoded = []
+    escaped = False
+    for char in raw[match.end():]:
+        if escaped:
+            encoded.append(char)
+            escaped = False
+        elif char == "\\":
+            encoded.append(char)
+            escaped = True
+        elif char == '"':
+            break
+        else:
+            encoded.append(char)
+    if escaped and encoded:
+        encoded.pop()
+    try:
+        return json.loads('"' + "".join(encoded) + '"')
+    except json.JSONDecodeError:
+        return ""
+
+
 class AgentRuntime:
     """Coordinates conversation state, bounded tool use and model inference."""
 
@@ -89,7 +119,7 @@ class AgentRuntime:
             return []
         return self.tool_executor.registry.list()
 
-    def chat(self, session_id: str, content: str) -> AgentReply:
+    def chat(self, session_id: str, content: str, on_token: Callable[[str], None] | None = None) -> AgentReply:
         if not self.store.get_session(session_id):
             raise KeyError(session_id)
         if not content.strip():
@@ -183,7 +213,30 @@ class AgentRuntime:
         tool_steps = 0
 
         while True:
-            raw_answer = adapter.chat(messages)
+            stream_method = getattr(adapter, "stream", None)
+            if on_token and callable(stream_method):
+                chunks: list[str] = []
+                emitted = 0
+                for chunk in stream_method(messages):
+                    chunks.append(chunk)
+                    if catalogue:
+                        partial = _partial_final_message("".join(chunks))
+                        if len(partial) > emitted:
+                            on_token(partial[emitted:])
+                            emitted = len(partial)
+                    else:
+                        on_token(chunk)
+                raw_answer = "".join(chunks)
+                if catalogue and emitted == 0 and _decode_action(raw_answer) is None:
+                    on_token(raw_answer)
+            else:
+                raw_answer = adapter.chat(messages)
+                if on_token:
+                    fallback_action = _decode_action(raw_answer) if catalogue else None
+                    if fallback_action and fallback_action.get("action") == "final":
+                        on_token(str(fallback_action.get("message", "")))
+                    elif not catalogue or fallback_action is None:
+                        on_token(raw_answer)
             action = _decode_action(raw_answer) if catalogue else None
             if action is None or action.get("action") == "final":
                 answer = str(action.get("message", "") if action else raw_answer).strip()

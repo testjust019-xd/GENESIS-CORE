@@ -82,7 +82,8 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Studio configuration for a self-hosted SearXNG endpoint
 - [x] Persistent CLI search-provider configuration with environment overrides
 - [x] Offline local-knowledge search remains the default
-- [ ] Token-level streaming and request cancellation across provider adapters
+- [x] Token-level streaming from Ollama and OpenAI-compatible local adapters into Studio (initial)
+- [ ] User cancellation and provider request interruption
 - [ ] End-to-end integration suite against a mock model and temporary state
 - [ ] Explicit opt-in live local-model smoke test and resource measurements
 
