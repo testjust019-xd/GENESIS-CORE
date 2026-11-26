@@ -50,6 +50,18 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [ ] Practice tasks and skill assessments
 - [ ] XP as a progress indicator, not a proxy for intelligence
 
+## Knowledge Engine — Initial local knowledge base
+- [x] Import UTF-8 TXT, Markdown and reStructuredText files (initial)
+- [x] Chunk documents with bounded size and overlap
+- [x] Persistent SQLite document and chunk storage with content deduplication
+- [x] SQLite FTS5 retrieval with a LIKE fallback
+- [x] Source-linked excerpts and chunk citations
+- [x] Agent context grounding from local knowledge with untrusted-source boundaries
+- [x] TUI and Studio document ingestion, search and deletion
+- [ ] Embedding-based semantic retrieval and hybrid ranking
+- [ ] PDF / Office document extraction and OCR
+- [ ] Knowledge graph, entity links and contradiction tracking
+
 ## Milestone 4 — Research and multimodal tools
 - [ ] Search providers and browser workflow
 - [ ] Source verification and citation storage
