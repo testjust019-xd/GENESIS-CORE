@@ -73,3 +73,34 @@ def test_import_file_accepts_markdown_and_rejects_other_formats(tmp_path):
         assert False, "Expected unsupported extension to be rejected"
     except KnowledgeError:
         pass
+
+
+def test_pdf_import_extracts_selectable_text_with_page_metadata(tmp_path, monkeypatch):
+    import sys
+    import types
+
+    from genesis_core.knowledge import KnowledgeStore
+    from genesis_core.state import StateStore
+
+    class Page:
+        def extract_text(self):
+            return "PDF page contains searchable local knowledge."
+
+    class Reader:
+        def __init__(self, path):
+            self.is_encrypted = False
+            self.pages = [Page()]
+
+    fake_module = types.ModuleType("pypdf")
+    fake_module.PdfReader = Reader
+    monkeypatch.setitem(sys.modules, "pypdf", fake_module)
+
+    store = KnowledgeStore(StateStore(tmp_path / "genesis.db"))
+    pdf = tmp_path / "notes.pdf"
+    pdf.write_bytes(b"%PDF-fake")
+
+    result = store.ingest_file(pdf)
+
+    assert result["metadata"]["format"] == ".pdf"
+    assert result["metadata"]["page_count"] == 1
+    assert store.search("searchable local knowledge")
