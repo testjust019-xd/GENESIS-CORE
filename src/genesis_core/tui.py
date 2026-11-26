@@ -11,6 +11,7 @@ from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
 from genesis_core.mission_engine import MissionEngine, MissionEngineError
 from genesis_core.memory import MemoryError, MemoryStore
+from genesis_core.knowledge import KnowledgeError, KnowledgeStore
 from genesis_core.state import StateStore
 from genesis_core.tools import ApprovalStore, PermissionManager, ToolExecutor, build_core_registry
 
@@ -34,6 +35,7 @@ def run_tui() -> int:
     agent = AgentRuntime(store=store, tool_executor=tool_executor)
     mission_engine = MissionEngine(store, missions, agent)
     memories = MemoryStore(store)
+    knowledge = KnowledgeStore(store)
     current = None
     sessions = store.list_sessions(limit=1)
     if sessions:
@@ -100,6 +102,9 @@ def run_tui() -> int:
                 "  /memory search <text> Search active memories\n"
                 "  /memory add <type> <text> Save an explicit memory\n"
                 "  /memory off|delete <id> Deactivate or delete a memory\n"
+                "  /knowledge add <path> Import a UTF-8 .txt/.md/.rst file\n"
+                "  /knowledge search <query> Search indexed documents\n"
+                "  /knowledge list|delete <id> Manage indexed documents\n"
                 "  /missions          List missions\n"
                 "  /mission new <title>  Create a mission\n"
                 "  /mission status <id> <status>  Update mission status\n"
@@ -193,6 +198,30 @@ def run_tui() -> int:
                     print("Usage: /memory list [type] | search <text> | add <episodic|semantic|procedural> <text> | off|delete <id>")
             except (MemoryError, KeyError) as exc:
                 print(f"Memory error: {exc}")
+        elif command == "/knowledge":
+            try:
+                if len(args) >= 2 and args[0] == "add":
+                    item = knowledge.ingest_file(" ".join(args[1:]))
+                    status = "already indexed" if item["duplicate"] else "indexed"
+                    print(f"Document {status}: {item['id']} — {item['chunk_count']} chunk(s)")
+                elif len(args) >= 2 and args[0] == "search":
+                    results = knowledge.search(" ".join(args[1:]))
+                    if not results:
+                        print("No matching knowledge found.")
+                    for item in results:
+                        citation = item["citation"]
+                        print(f"[{citation['title']} · chunk {citation['chunk']}] {item['excerpt']}")
+                        print(f"  Source: {citation['source']}")
+                elif len(args) == 1 and args[0] == "list":
+                    for item in knowledge.list_documents():
+                        print(f"{item['id']} — {item['title']} ({item['chunk_count']} chunks)")
+                elif len(args) == 2 and args[0] == "delete":
+                    knowledge.delete_document(args[1])
+                    print(f"Knowledge document {args[1]} removed.")
+                else:
+                    print("Usage: /knowledge add <path> | search <query> | list | delete <id>")
+            except (KnowledgeError, KeyError, OSError) as exc:
+                print(f"Knowledge error: {exc}")
         elif command == "/missions":
             for mission in missions.list():
                 print(
