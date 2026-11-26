@@ -11,6 +11,7 @@ from genesis_core.agent import AgentRuntime, ModelError, build_default_tool_exec
 from genesis_core.hardware import inspect_hardware
 from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
+from genesis_core.mission_engine import MissionEngine, MissionEngineError
 from genesis_core.state import StateStore
 from genesis_core.tools import ToolError
 
@@ -19,6 +20,7 @@ store = StateStore()
 tool_executor, approval_store = build_default_tool_executor(store)
 agent = AgentRuntime(store=store, tool_executor=tool_executor)
 mission_store = MissionStore(state=store)
+mission_engine = MissionEngine(store, mission_store, agent)
 
 
 class SessionInput(BaseModel):
@@ -116,6 +118,38 @@ def update_mission(mission_id: str, payload: MissionStatusInput) -> dict:
         raise HTTPException(status_code=404, detail="Mission not found") from exc
     except MissionError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+
+@app.get("/api/missions/{mission_id}/tasks")
+def list_mission_tasks(mission_id: str) -> dict:
+    if not mission_store.get(mission_id):
+        raise HTTPException(status_code=404, detail="Mission not found")
+    return {"tasks": mission_store.list_tasks(mission_id)}
+
+
+@app.post("/api/missions/{mission_id}/plan")
+def plan_mission(mission_id: str) -> dict:
+    try:
+        return mission_engine.plan(mission_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Mission not found") from exc
+    except (MissionError, MissionEngineError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ModelError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/api/missions/{mission_id}/run")
+def run_mission_step(mission_id: str) -> dict:
+    try:
+        return mission_engine.run_next(mission_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Mission not found") from exc
+    except (MissionError, MissionEngineError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ModelError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.get("/api/approvals")
