@@ -7,12 +7,14 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from genesis_core import __version__
+from genesis_core.agent import AgentRuntime, ModelError
 from genesis_core.hardware import inspect_hardware
 from genesis_core.models import discover_runtimes
 from genesis_core.state import StateStore
 
 app = FastAPI(title="GENESIS CORE Studio", version=__version__)
 store = StateStore()
+agent = AgentRuntime(store=store)
 
 
 class SessionInput(BaseModel):
@@ -30,7 +32,7 @@ def status() -> dict:
         "version": __version__,
         "status": "foundation",
         "interfaces": ["TUI", "Studio"],
-        "agent_runtime": "not_connected",
+        "agent_runtime": "ready",
         "hardware": inspect_hardware(),
         "model_runtimes": [runtime.to_dict() for runtime in discover_runtimes()],
     }
@@ -56,12 +58,20 @@ def messages(session_id: str) -> dict:
 @app.post("/api/sessions/{session_id}/messages")
 def add_message(session_id: str, payload: MessageInput) -> dict:
     try:
-        message = store.add_message(session_id, "user", payload.content)
+        reply = agent.chat(session_id, payload.content)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Conversation not found") from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {"message": message, "agent_runtime": "not_connected"}
+    except ModelError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {
+        "message": reply.user_message,
+        "assistant_message": reply.assistant_message,
+        "provider": reply.provider,
+        "model": reply.model,
+        "agent_runtime": "ready",
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
