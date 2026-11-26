@@ -76,6 +76,16 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [ ] Office document extraction and scanned-PDF OCR
 - [ ] Knowledge graph, entity links and contradiction tracking
 
+## Finalization — Studio chat and configurable search
+- [x] First-party browser chat with persistent conversations (initial)
+- [x] Optimistic chat feedback while the model is processing (initial)
+- [x] Studio configuration for a self-hosted SearXNG endpoint
+- [x] Persistent CLI search-provider configuration with environment overrides
+- [x] Offline local-knowledge search remains the default
+- [ ] Token-level streaming and request cancellation across provider adapters
+- [ ] End-to-end integration suite against a mock model and temporary state
+- [ ] Explicit opt-in live local-model smoke test and resource measurements
+
 ## Milestone 4 — Research and multimodal tools
 - [x] Search provider interface with optional SearXNG and Brave adapters (initial)
 - [x] Offline fallback to the local Knowledge Engine

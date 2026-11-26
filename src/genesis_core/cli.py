@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from genesis_core import __version__
-from genesis_core.config import read_settings, set_model
+from genesis_core.config import get_search_settings, read_settings, set_model, set_search_settings
 from genesis_core.hardware import format_bytes, inspect_hardware
 from genesis_core.models import discover_runtimes
 from genesis_core.onboarding import (
@@ -68,6 +68,12 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("setup", help="configure and optionally download a recommended local model")
     subparsers.add_parser("recommend", help="recommend local models for this machine")
     subparsers.add_parser("models", help="discover local model runtimes and available models")
+    search = subparsers.add_parser("search", help="configure the optional web research provider")
+    search_sub = search.add_subparsers(dest="search_action")
+    search_sub.add_parser("show", help="show search provider configuration")
+    search_set = search_sub.add_parser("set", help="select offline, SearXNG or Brave search")
+    search_set.add_argument("provider", choices=["offline", "searxng", "brave"])
+    search_set.add_argument("--url", default="", help="SearXNG base URL (for example http://127.0.0.1:8080)")
     test = subparsers.add_parser("test", help="run local GENESIS diagnostics and self-tests")
     test.add_argument("--quick", action="store_true", help="run safe local self-tests (default)")
     test.add_argument("--full", action="store_true", help="also probe local model runtime endpoints")
@@ -149,6 +155,21 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print("No primary model selected. GENESIS will auto-detect a local model.")
         return 0
+    if args.command == "search":
+        try:
+            if args.search_action == "set":
+                path = set_search_settings(args.provider, args.url)
+                print(f"Search provider saved to {path}: {args.provider}")
+                if args.provider == "searxng":
+                    print(f"SearXNG endpoint: {args.url.rstrip('/')}")
+                return 0
+            settings = get_search_settings()
+            print(f"Search provider: {settings['provider']}")
+            print(f"SearXNG URL: {settings['searxng_url'] or '(not configured)'}")
+            return 0
+        except ValueError as exc:
+            print(f"Search configuration error: {exc}", file=sys.stderr)
+            return 2
     if args.command == "models":
         print("GENESIS CORE — LOCAL MODEL RUNTIMES")
         for runtime in discover_runtimes():

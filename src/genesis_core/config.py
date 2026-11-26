@@ -35,6 +35,34 @@ def write_settings(settings: dict[str, Any]) -> Path:
     return path
 
 
+def get_search_settings() -> dict[str, str]:
+    """Return persisted optional search-provider settings."""
+    search = read_settings().get("research", {})
+    if not isinstance(search, dict):
+        search = {}
+    return {
+        "provider": str(search.get("provider", "offline")),
+        "searxng_url": str(search.get("searxng_url", "")),
+    }
+
+
+def set_search_settings(provider: str, searxng_url: str = "") -> Path:
+    """Persist a search provider without storing credentials or enabling network access implicitly."""
+    provider = provider.strip().lower()
+    if provider not in {"offline", "searxng", "brave"}:
+        raise ValueError("Search provider must be offline, searxng, or brave.")
+    if provider == "searxng":
+        from urllib.parse import urlparse
+        parsed = urlparse(searxng_url.strip())
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise ValueError("SearXNG URL must be an absolute HTTP(S) URL.")
+        if parsed.scheme != "https" and parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
+            raise ValueError("A remote SearXNG instance must use HTTPS.")
+    settings = read_settings()
+    settings["research"] = {"provider": provider, "searxng_url": searxng_url.strip().rstrip("/")}
+    return write_settings(settings)
+
+
 def set_model(provider: str, model: str, base_url: str | None = None) -> Path:
     if provider not in {"ollama", "llama_cpp", "lm_studio"}:
         raise ValueError("Provider must be ollama, llama_cpp, or lm_studio.")
