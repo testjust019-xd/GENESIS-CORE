@@ -204,7 +204,8 @@ def test_adaptive_replan_preserves_completed_work_and_records_history(tmp_path):
     assert len(history) == 2
     assert history[0]["version"] == 1
     assert history[1]["version"] == 2
-    assert "Dashboard access is unavailable" in history[1]["plan"]["tasks"][1]["result"]
+    assert history[1]["plan"]["tasks"][0]["title"] == "Cross-check public sources"
+    assert "Dashboard access is unavailable" in history[1]["plan"]["supersedes"]["tasks"][1]["result"]
     assert "Collected public release notes" in adapter.calls[0][-1]["content"]
 
 
