@@ -10,6 +10,7 @@ from pathlib import Path
 
 from genesis_core import __version__
 from genesis_core.hardware import format_bytes, inspect_hardware
+from genesis_core.models import discover_runtimes
 
 DEFAULT_HOME = Path(os.environ.get("GENESIS_HOME", Path.home() / ".genesis"))
 
@@ -79,6 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("doctor", help="inspect host resources and runtime environment")
     subparsers.add_parser("init", help="create the local GENESIS data directory")
+    subparsers.add_parser("models", help="discover local model runtimes and available models")
 
     serve = subparsers.add_parser("serve", help="start the local web dashboard")
     serve.add_argument("--host", default="127.0.0.1", help="bind address (default: localhost only)")
@@ -96,6 +98,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "init":
         return _init()
+    if args.command == "models":
+        print("GENESIS CORE — LOCAL MODEL RUNTIMES")
+        for runtime in discover_runtimes():
+            state = "ONLINE" if runtime.available else "OFFLINE"
+            print(f"\\n{runtime.provider}: {state} — {runtime.base_url}")
+            print(f"  {runtime.detail}")
+            for model in runtime.models:
+                print(f"  • {model}")
+        return 0
     if args.command == "serve":
         try:
             import uvicorn
