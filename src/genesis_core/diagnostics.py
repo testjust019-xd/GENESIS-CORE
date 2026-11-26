@@ -6,6 +6,7 @@ import json
 import os
 import platform
 import sqlite3
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -31,7 +32,7 @@ def _check(name: str, fn) -> dict[str, Any]:
 
 
 def _python_check() -> str:
-    if platform.python_version_tuple() < ("3", "11", "0"):
+    if sys.version_info < (3, 11):
         raise RuntimeError("Python 3.11 or newer is required.")
     return f"Python {platform.python_version()}"
 
