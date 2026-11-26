@@ -27,8 +27,10 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Basic context-aware chat loop (initial)
 - [x] Persistent mission and goal representation (initial CRUD and status transitions)
 - [ ] Planner / executor / observer loop
-- [ ] Tool registry with JSON schemas
-- [ ] Permission profiles and approval workflow
+- [x] Initial tool registry with JSON-schema subset validation and duplicate protection
+- [x] Initial read-only workspace tools (directory listing and UTF-8 file reading, path-confined)
+- [x] Initial fail-closed permission profiles and persistent approval queue (write/system actions remain gated)
+- [ ] Permission profiles exposed in Studio/TUI and approval management UI
 - [ ] Timeouts, budgets, retries and audit log
 - [ ] Structured activity events shared by TUI and Studio
 
