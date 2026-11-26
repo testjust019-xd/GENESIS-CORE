@@ -83,7 +83,6 @@ def test_duplicate_slugs_and_missing_review_checklist_fail(tmp_path):
     create_skill(store)
     with pytest.raises(SkillError):
         create_skill(store)
-    no_checks = store.create("No checks", "Description", "Instructions", [], ["Review"])
-    store.update(no_checks["id"], checklist=[])
+    no_checks = store.create("No checks", "Description", "Instructions", [], [])
     with pytest.raises(SkillError):
         store.submit(no_checks["id"])
