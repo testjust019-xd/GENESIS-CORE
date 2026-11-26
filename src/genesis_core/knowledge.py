@@ -156,6 +156,27 @@ class KnowledgeStore:
             "chunk_count": len(chunks), "duplicate": False,
         }
 
+    def ingest_file(self, path: str | Path) -> dict[str, Any]:
+        """Import a user-selected UTF-8 text file (Markdown or plain text)."""
+        file_path = Path(path).expanduser().resolve(strict=True)
+        if not file_path.is_file():
+            raise KnowledgeError("The selected path is not a regular file.")
+        if file_path.suffix.lower() not in {".txt", ".md", ".markdown", ".rst"}:
+            raise KnowledgeError("Supported file types: .txt, .md, .markdown and .rst.")
+        size = file_path.stat().st_size
+        if size > self.MAX_DOCUMENT_CHARS * 4:
+            raise KnowledgeError("File exceeds the 4 MB import limit.")
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            raise KnowledgeError("File must be valid UTF-8 text.") from exc
+        return self.ingest_text(
+            title=file_path.name,
+            content=content,
+            source_uri=str(file_path),
+            metadata={"format": file_path.suffix.lower(), "size_bytes": size},
+        )
+
     def list_documents(self, limit: int = 100) -> list[dict[str, Any]]:
         with self._connect() as db:
             rows = db.execute(
