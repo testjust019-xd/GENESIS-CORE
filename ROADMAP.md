@@ -11,6 +11,9 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Automated test workflow added and passing
 - [ ] Configuration validation and structured logs
 - [x] Initial local Test Bench for storage, permissions and environment diagnostics
+- [x] First-launch welcome overview with hardware and local-runtime detection (initial)
+- [x] Conservative hardware resource profiles and model memory estimates (initial)
+- [x] Single detected local model can be selected as primary during guided setup
 
 ## Milestone 1 — Model connectivity
 - [x] Common chat adapter contract (initial)

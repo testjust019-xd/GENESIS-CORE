@@ -39,17 +39,20 @@ python -m pip install -e ".[web,dev]"
 
 For optional selectable-text PDF ingestion, install the document extra with `python -m pip install -e ".[documents]"`.
 
-## First verification
-
-Before configuring a model, run the safe local checks:
+## First verification and setup
 
 ```bash
 genesis test
+genesis welcome
 genesis doctor
-genesis test --json-report genesis-diagnostic.json
+genesis models
+genesis recommend
+genesis setup
 ```
 
-`genesis test --full` also checks whether the default local Ollama, llama.cpp and LM Studio model-list endpoints respond. This probe is read-only and does not run inference. The default Test Bench uses temporary databases, makes no network requests, downloads nothing and does not modify your real GENESIS database. See [docs/TEST_BENCH.md](docs/TEST_BENCH.md).
+The first interactive TUI or Studio launch shows a welcome overview if no primary model is configured. It reports a hardware profile and detects local model runtimes. If one model is found, setup offers to select it; if none is found and Ollama is running, it can offer a recommended download after explicit confirmation. No runtime is installed automatically. See [docs/FIRST_LAUNCH.md](docs/FIRST_LAUNCH.md).
+
+The default Test Bench uses temporary databases, makes no network requests, downloads nothing and does not modify your real GENESIS database. `genesis test --full` additionally checks local model-list endpoints without running inference. See [docs/TEST_BENCH.md](docs/TEST_BENCH.md).
 
 ## Launch GENESIS
 
@@ -69,15 +72,12 @@ Then open `http://127.0.0.1:8765`. Both interfaces use the same local database a
 ## Other commands
 
 ```bash
-genesis recommend
-genesis setup
-genesis models
 genesis model show
 genesis model set ollama llama3.2
 genesis --help
 ```
 
-Runtime discovery checks local endpoints for Ollama, llama.cpp and LM Studio. URLs can be overridden with `GENESIS_OLLAMA_URL`, `GENESIS_LLAMA_CPP_URL` and `GENESIS_LM_STUDIO_URL`. The setup wizard only downloads a model after explicit confirmation.
+Runtime discovery checks local endpoints for Ollama, llama.cpp and LM Studio. URLs can be overridden with `GENESIS_OLLAMA_URL`, `GENESIS_LLAMA_CPP_URL` and `GENESIS_LM_STUDIO_URL`.
 
 ## Current boundaries
 
@@ -85,7 +85,7 @@ The agent loop and mission execution are deliberately bounded. Only registered t
 
 ## Architecture and roadmap
 
-See [ROADMAP.md](ROADMAP.md), [docs/INTERFACES.md](docs/INTERFACES.md) and [docs/MODEL_CORE.md](docs/MODEL_CORE.md).
+See [ROADMAP.md](ROADMAP.md), [docs/INTERFACES.md](docs/INTERFACES.md), [docs/MODEL_CORE.md](docs/MODEL_CORE.md), [docs/TEST_BENCH.md](docs/TEST_BENCH.md) and [docs/FIRST_LAUNCH.md](docs/FIRST_LAUNCH.md).
 
 ## License
 
