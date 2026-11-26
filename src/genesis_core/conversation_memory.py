@@ -121,7 +121,7 @@ class ConversationMemoryEngine:
             with sqlite3.connect(self.state.database_path, timeout=10) as db:
                 existing = db.execute(
                     "SELECT id FROM memory_candidates WHERE session_id = ? "
-                    "AND content = ? AND status = 'pending' LIMIT 1",
+                    "AND content = ? LIMIT 1",
                     (session_id, content),
                 ).fetchone()
                 if existing:
