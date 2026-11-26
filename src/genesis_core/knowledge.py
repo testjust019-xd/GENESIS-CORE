@@ -185,8 +185,8 @@ class KnowledgeStore:
                 for index, page in enumerate(reader.pages):
                     extracted = page.extract_text() or ""
                     if extracted.strip():
-                        page_text.append(f"[Page {index + 1}]\\n{extracted}")
-                content = "\\n\\n".join(page_text)
+                        page_text.append(f"[Page {index + 1}]\n{extracted}")
+                content = "\n\n".join(page_text)
             except KnowledgeError:
                 raise
             except Exception as exc:
