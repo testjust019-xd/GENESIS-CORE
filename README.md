@@ -49,10 +49,11 @@ pip install -e ".[web]"
 genesis --help
 genesis doctor
 genesis init
+genesis models
 genesis serve
 ```
 
-The web server binds to `127.0.0.1` by default. Open `http://127.0.0.1:8765`.
+The web server binds to `127.0.0.1` by default. Open `http://127.0.0.1:8765`.\n\n`genesis models` checks the default local endpoints for Ollama, llama.cpp and LM Studio. Runtime URLs can be overridden with `GENESIS_OLLAMA_URL`, `GENESIS_LLAMA_CPP_URL` and `GENESIS_LM_STUDIO_URL`.
 
 ## Planned architecture
 
