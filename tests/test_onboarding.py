@@ -49,8 +49,8 @@ def test_pull_ollama_model_streams_progress(monkeypatch):
         def __exit__(self, *args):
             return False
         def __iter__(self):
-            yield (json.dumps({"status": "pulling", "completed": 50, "total": 100}) + "\\n").encode()
-            yield (json.dumps({"status": "success"}) + "\\n").encode()
+            yield (json.dumps({"status": "pulling", "completed": 50, "total": 100}) + "\n").encode()
+            yield (json.dumps({"status": "success"}) + "\n").encode()
 
     captured = {}
     def fake_urlopen(request, timeout):
