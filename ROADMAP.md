@@ -53,7 +53,8 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] User-triggered conversation memory proposals with exact user-message evidence and explicit review (initial)
 - [ ] Verified conversation/session summarisation into episodic memory
 - [x] Initial user-directed learning curricula and persistent practice attempts
-- [x] Initial curriculum generation from user learning goals\n- [ ] Gap analysis and adaptive curriculum generation
+- [x] Initial curriculum generation from user learning goals
+- [ ] Gap analysis and adaptive curriculum generation
 - [x] Initial practice tasks with transparent deterministic concept-coverage assessment
 - [x] XP as a non-farmable progress indicator, not a proxy for intelligence
 
