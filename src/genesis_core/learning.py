@@ -120,7 +120,7 @@ class LearningEngine:
                 raise LearningError("Each lesson needs 2 to 8 expected concepts.")
             if any(not isinstance(x, str) or not x.strip() or len(x) > 100 for x in concepts):
                 raise LearningError("Expected concepts must be short non-empty phrases.")
-            concepts = list(dict.fromkeys(x.strip() for x in concepts))
+            concepts = list({x.strip().casefold(): x.strip() for x in concepts}.values())
             if len(concepts) < 2:
                 raise LearningError("Each lesson needs at least two distinct expected concepts.")
             if not isinstance(hints, list) or len(hints) > 5 or any(
@@ -234,7 +234,7 @@ class LearningEngine:
                 "JOIN learning_lessons l ON l.id=a.lesson_id WHERE l.course_id=?",
                 (course_id,),
             ).fetchone()[0]
-        return {"lesson_id": lesson_id, "score": score, "matched_concepts": matched,
+        return {"lesson_id": lesson_id, "course_id": course_id, "score": score, "matched_concepts": matched,
                 "missing_concepts": missing, "best_score": max(previous, score),
                 "completed": bool(completed or lesson["completed"]), "xp_awarded": xp,
                 "total_xp": total_xp,
