@@ -677,7 +677,8 @@ button,input{font:inherit}button{cursor:pointer;color:inherit}.app{height:100vh;
 </div>
 <script>
 let activeId=null;
-let activeResearchRunId=null;\nlet activeLearningLessonId=null;
+let activeResearchRunId=null;
+let activeLearningLessonId=null;
 const $=id=>document.getElementById(id);
 async function api(path,options={}){const response=await fetch(path,{headers:{'Content-Type':'application/json'},...options});if(!response.ok)throw new Error((await response.json()).detail||'Request failed');return response.json()}
 function addMessage(m){const box=document.createElement('div');box.className='msg '+(m.role==='user'?'user':'');const role=document.createElement('div');role.className='role';role.textContent=m.role.toUpperCase();const body=document.createElement('div');body.textContent=m.content;box.append(role,body);$('messages').append(box)}
