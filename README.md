@@ -24,7 +24,7 @@ GENESIS CORE is its own agent environment. Local runtimes such as Ollama, llama.
 
 - Linux first (Ubuntu/Debian are the initial targets)
 - Python 3.11+
-- A local model runtime is required for actual AI replies; the interfaces and diagnostics can run without one
+- A local model runtime is required for actual AI replies; the first TUI launch offers a hardware-aware model setup if none is configured
 
 ## Install from source
 
@@ -56,6 +56,8 @@ Other commands:
 
 ```bash
 genesis doctor
+genesis recommend
+genesis setup
 genesis models
 genesis model show
 genesis model set ollama llama3.2
@@ -64,7 +66,7 @@ genesis --help
 
 The Studio server binds to `127.0.0.1` by default. Runtime discovery checks the default local endpoints for Ollama, llama.cpp and LM Studio. URLs can be overridden with `GENESIS_OLLAMA_URL`, `GENESIS_LLAMA_CPP_URL` and `GENESIS_LM_STUDIO_URL`.
 
-**Current limitation:** the first agent loop supports direct chat only. It does not yet plan multi-step missions, call tools, browse the web, or perform background learning. If no local model is reachable, GENESIS reports a provider error rather than simulating an answer.
+**Current limitation:** the first agent loop supports direct chat only. It does not yet plan multi-step missions, call tools, browse the web, or perform background learning. If no local model is reachable, GENESIS reports a provider error rather than simulating an answer. On first TUI launch, an optional setup wizard detects available runtimes, recommends small Ollama models based on RAM, and downloads a model only after explicit confirmation. Run genesis recommend to preview suggestions or genesis setup to configure one later.
 
 ## Architecture
 
@@ -78,10 +80,10 @@ See [docs/INTERFACES.md](docs/INTERFACES.md) for the TUI/Studio contract and [do
 | Hardware Monitor | CPU, RAM, disk and platform detection | Initial |
 | Model Discovery | Detect local runtimes and models | Initial |
 | Model Adapters | Ollama and OpenAI-compatible local chat adapters | Initial |
-| Agent Runtime | Context-aware direct chat loop; planner and tools pending | Initial |\n| Mission Control | Persistent goals, priorities and status transitions | Initial |
+| Agent Runtime | Context-aware direct chat loop; planner and tools pending | Initial |\n| First-Run Setup | Hardware-aware model recommendations and opt-in Ollama download | Initial |\n| Mission Control | Persistent goals, priorities and status transitions | Initial |
 | Memory | Episodic and semantic knowledge | Planned |
 | Research Engine | Search, source capture and verification | Planned |
-| Tool System | Permissioned tools and extensions | Planned |
+| Tool System | Permissioned tools and extensions | Initial foundation |
 | Multimodal | Image, audio, video and document pipelines | Planned |
 | Skill & Evaluation | Practice, competencies and repeatable benchmarks | Planned |
 | Training Lab | Optional LoRA / fine-tuning workflows | Planned |
