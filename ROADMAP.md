@@ -26,6 +26,8 @@ This roadmap describes intended work. A feature is complete only when implemente
 ## Milestone 2 — Agent runtime
 - [x] Basic context-aware chat loop (initial)
 - [x] Persistent mission and goal representation (initial CRUD and status transitions)
+- [x] Structured mission plans persisted as ordered tasks
+- [x] Step-by-step mission execution with stored results and resume after interruption
 - [x] Bounded planner / executor / observer loop over chat adapters (initial)
 - [x] Initial tool registry with JSON-schema subset validation and duplicate protection
 - [x] Initial read-only workspace tools (directory listing and UTF-8 file reading, path-confined)
@@ -35,6 +37,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [ ] Configurable permission profiles and approval management UI
 - [ ] Timeouts, budgets, retries and audit log
 - [ ] Structured activity events shared by TUI and Studio
+- [ ] Background mission scheduling, pause/resume controls and resource budgets
 
 ## Milestone 3 — Memory and learning
 - [x] Persistent conversation history
