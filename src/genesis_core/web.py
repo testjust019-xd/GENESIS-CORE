@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse
 
 from genesis_core import __version__
 from genesis_core.hardware import format_bytes, inspect_hardware
+from genesis_core.models import discover_runtimes
 
 app = FastAPI(title="GENESIS CORE", version=__version__)
 
@@ -28,6 +29,7 @@ def status() -> dict:
             "training and evolution",
         ],
         "hardware": hardware,
+        "model_runtimes": [runtime.to_dict() for runtime in discover_runtimes()],
     }
 
 
@@ -71,7 +73,7 @@ def dashboard() -> str:
           <div class="card"><div class="label">DISK FREE</div><div class="value">{format_bytes(data["disk_free_bytes"])}</div></div>
           <div class="card"><div class="label">ACTIVE MODEL</div><div class="value">Not connected yet</div></div>
         </section>
-        <p>Next milestone: connect local model runtimes and introduce the permissioned agent loop.</p>
+        <p>Next milestone: select a primary model and introduce the permissioned agent loop.</p>
         <p>Machine-readable status: <code>/api/status</code></p>
       </main>
     </body>
