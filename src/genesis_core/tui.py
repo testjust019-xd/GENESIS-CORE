@@ -102,6 +102,9 @@ def run_tui() -> int:
                 "  /memory search <text> Search active memories\n"
                 "  /memory add <type> <text> Save an explicit memory\n"
                 "  /memory mission <id> Capture a completed mission as an episode\n"
+                "  /memory extract [session-id] Propose conversation memories\n"
+                "  /memory candidates [session-id] List pending proposals\n"
+                "  /memory candidate <id> accept|reject Review a proposal\n"
                 "  /memory off|delete <id> Deactivate or delete a memory\n"
                 "  /missions          List missions\n"
                 "  /mission new <title>  Create a mission\n"
@@ -188,7 +191,7 @@ def run_tui() -> int:
                 elif args and args[0] == "candidates":
                     target = args[1] if len(args) > 1 else None
                     for item in conversation_memory.list_candidates(session_id=target):
-                        print(f"{item['id']} [{item['memory_type']}] {item['content']}\\n  Evidence: {item['evidence']}")
+                        print(f"{item['id']} [{item['memory_type']}] {item['content']}\n  Evidence: {item['evidence']}")
                 elif len(args) == 3 and args[0] == "candidate":
                     item = conversation_memory.decide(args[1], args[2])
                     print(f"Candidate {item['id']}: {item['status']}" +
