@@ -80,7 +80,9 @@ See [docs/INTERFACES.md](docs/INTERFACES.md) for the TUI/Studio contract and [do
 | Hardware Monitor | CPU, RAM, disk and platform detection | Initial |
 | Model Discovery | Detect local runtimes and models | Initial |
 | Model Adapters | Ollama and OpenAI-compatible local chat adapters | Initial |
-| Agent Runtime | Context-aware direct chat loop; planner and tools pending | Initial |\n| First-Run Setup | Hardware-aware model recommendations and opt-in Ollama download | Initial |\n| Mission Control | Persistent goals, priorities and status transitions | Initial |
+| Agent Runtime | Context-aware direct chat loop; planner and tools pending | Initial |
+| First-Run Setup | Hardware-aware model recommendations and opt-in Ollama download | Initial |
+| Mission Control | Persistent goals, priorities and status transitions | Initial |
 | Memory | Episodic and semantic knowledge | Planned |
 | Research Engine | Search, source capture and verification | Planned |
 | Tool System | Permissioned tools and extensions | Initial foundation |
