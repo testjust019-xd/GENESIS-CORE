@@ -12,6 +12,7 @@ from genesis_core.hardware import inspect_hardware
 from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
 from genesis_core.mission_engine import MissionEngine, MissionEngineError
+from genesis_core.multi_agent import MultiAgentEngine, MultiAgentError
 from genesis_core.memory import MemoryError, MemoryStore
 from genesis_core.conversation_memory import ConversationMemoryEngine, ConversationMemoryError
 from genesis_core.knowledge import KnowledgeError, KnowledgeStore
@@ -26,11 +27,17 @@ tool_executor, approval_store = build_default_tool_executor(store)
 agent = AgentRuntime(store=store, tool_executor=tool_executor)
 mission_store = MissionStore(state=store)
 mission_engine = MissionEngine(store, mission_store, agent)
+multi_agent_engine = MultiAgentEngine(store, agent._adapter())
 memory_store = MemoryStore(store)
 conversation_memory = ConversationMemoryEngine(store, memory_store)
 knowledge_store = KnowledgeStore(store)
 research_engine = ResearchEngine(store, knowledge_store)
 skill_store = SkillStore(store.database_path, {item['name'] for item in tool_executor.registry.list()})
+
+
+class CollaborationInput(BaseModel):
+    objective: str = Field(min_length=1, max_length=12000)
+    roles: list[str] | None = Field(default=None, max_length=4)
 
 
 class SessionInput(BaseModel):
@@ -116,6 +123,36 @@ def status() -> dict:
         "hardware": inspect_hardware(),
         "model_runtimes": [runtime.to_dict() for runtime in discover_runtimes()],
     }
+
+
+
+
+@app.get("/api/agents/roles")
+def list_agent_roles() -> dict:
+    return {"roles": multi_agent_engine.roles(), "primary_model_only": True}
+
+
+@app.post("/api/agents/collaborate")
+def collaborate_agents(payload: CollaborationInput) -> dict:
+    try:
+        return multi_agent_engine.collaborate(payload.objective, payload.roles)
+    except MultiAgentError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ModelError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/agents/runs")
+def list_agent_runs() -> dict:
+    return {"runs": multi_agent_engine.list_runs()}
+
+
+@app.get("/api/agents/runs/{run_id}")
+def get_agent_run(run_id: str) -> dict:
+    result = multi_agent_engine.get_run(run_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Agent collaboration run not found")
+    return {"run": result}
 
 
 @app.get("/api/sessions")
