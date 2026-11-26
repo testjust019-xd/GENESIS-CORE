@@ -44,7 +44,7 @@ The TUI should remain usable over SSH and on modest Linux machines.
 The graphical interface is launched locally through a command such as `genesis studio` and opened in the user's browser. It should provide:
 
 - project/file explorer
-- central agent conversation
+- central agent conversation with server-sent-event token streaming
 - integrated terminal and editor panels
 - mission control and task timeline
 - live activity/tool trace
