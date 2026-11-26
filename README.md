@@ -8,7 +8,7 @@ GENESIS CORE is its own agent environment. Local runtimes such as Ollama, llama.
 
 ## Project status
 
-**Early foundation / v0.1.0-dev.** The repository includes two first-party interfaces (**GENESIS TUI** and **GENESIS Studio**), a shared SQLite conversation store, local runtime discovery, initial chat adapters for Ollama and OpenAI-compatible local servers, and a first agent loop. The agent can now send conversation context to a selected local model and persist its reply. A persistent mission queue is also available in the TUI and Studio. Multi-step planning, tool execution, long-term memory, research, and training remain future milestones. Automated tests and CI have been added, and the initial test run passed.
+**Early foundation / v0.1.0-dev.** The repository includes two first-party interfaces (**GENESIS TUI** and **GENESIS Studio**), a shared SQLite conversation store, local runtime discovery, initial chat adapters for Ollama and OpenAI-compatible local servers, and a bounded planner/executor/observer agent loop. The agent can request registered tools through a structured chat protocol, execute read-only workspace tools, inspect results, and persist its final reply. Elevated actions remain approval-gated. A persistent mission queue is also available in the TUI and Studio. Advanced multi-step mission planning, background execution, long-term memory, research, and training remain future milestones. Automated tests and CI have been added, and the initial test run passed.
 
 ## Principles
 
@@ -66,7 +66,7 @@ genesis --help
 
 The Studio server binds to `127.0.0.1` by default. Runtime discovery checks the default local endpoints for Ollama, llama.cpp and LM Studio. URLs can be overridden with `GENESIS_OLLAMA_URL`, `GENESIS_LLAMA_CPP_URL` and `GENESIS_LM_STUDIO_URL`.
 
-**Current limitation:** the first agent loop supports direct chat only. It does not yet plan multi-step missions, call tools, browse the web, or perform background learning. If no local model is reachable, GENESIS reports a provider error rather than simulating an answer. On first TUI launch, an optional setup wizard detects available runtimes, recommends small Ollama models based on RAM, and downloads a model only after explicit confirmation. Run genesis recommend to preview suggestions or genesis setup to configure one later.
+**Current limitation:** the initial planner/executor/observer loop is deliberately bounded (four tool steps by default) and uses a JSON action protocol over ordinary chat adapters, not provider-native tool calling. It currently exposes only time and read-only workspace tools. Write, network and system actions are not enabled by default; sensitive actions require an approval workflow. It does not yet run missions in the background, browse the web, or perform background learning. If no local model is reachable, GENESIS reports a provider error rather than simulating an answer. On first TUI launch, an optional setup wizard detects available runtimes, recommends small Ollama models based on RAM, and downloads a model only after explicit confirmation. Run genesis recommend to preview suggestions or genesis setup to configure one later.
 
 ## Architecture
 
@@ -80,12 +80,12 @@ See [docs/INTERFACES.md](docs/INTERFACES.md) for the TUI/Studio contract and [do
 | Hardware Monitor | CPU, RAM, disk and platform detection | Initial |
 | Model Discovery | Detect local runtimes and models | Initial |
 | Model Adapters | Ollama and OpenAI-compatible local chat adapters | Initial |
-| Agent Runtime | Context-aware direct chat loop; planner and tools pending | Initial |
+| Agent Runtime | Bounded planner / executor / observer loop over chat adapters | Initial |
 | First-Run Setup | Hardware-aware model recommendations and opt-in Ollama download | Initial |
 | Mission Control | Persistent goals, priorities and status transitions | Initial |
 | Memory | Episodic and semantic knowledge | Planned |
 | Research Engine | Search, source capture and verification | Planned |
-| Tool System | Permissioned tools and extensions | Initial foundation |
+| Tool System | Schema-validated tools, workspace confinement, approval queue and agent integration | Initial foundation |
 | Multimodal | Image, audio, video and document pipelines | Planned |
 | Skill & Evaluation | Practice, competencies and repeatable benchmarks | Planned |
 | Training Lab | Optional LoRA / fine-tuning workflows | Planned |
