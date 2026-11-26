@@ -54,7 +54,7 @@ def test_research_intelligence_generates_persists_and_lists_cited_report(tmp_pat
     assert report["claims"][0]["source_ids"] == [sources[0]["id"]]
     assert intelligence.get(report["id"])["title"] == report["title"]
     assert intelligence.list(run["id"])[0]["id"] == report["id"]
-    assert "UNTRUSTED" in adapter.messages[1]["content"]
+    assert "UNTRUSTED" in adapter.messages[0]["content"]
 
 
 def test_research_intelligence_excludes_pending_and_rejected_sources(tmp_path):
