@@ -217,6 +217,9 @@ def test_replan_requires_blocked_mission_and_keeps_old_plan_on_invalid_output(tm
     tasks = missions.save_plan(mission["id"], session["id"], [
         {"title": "First", "instructions": "Do first."}
     ])
+    missions.set_status(mission["id"], "running")
+    missions.set_task_status(tasks[0]["id"], "blocked", "A dependency is unavailable.")
+    missions.set_status(mission["id"], "blocked")
     adapter = ScriptedAdapter(["not valid JSON"])
     engine = MissionEngine(state, missions, AgentRuntime(store=state, adapter=adapter))
 
