@@ -64,12 +64,12 @@ class ConversationMemoryEngine:
         if not self.state.get_session(session_id):
             raise KeyError(session_id)
         messages = self.state.list_messages(session_id)
-        user_messages = [m for m in messages if m["role"] == "user"][-max(1, min(limit, 60)):]
+        user_messages = [m for m in messages if m["role"] == "user"][-max(1, min(limit, 20)):]
         if not user_messages:
             raise ConversationMemoryError("This conversation has no user messages to review.")
 
         transcript = [
-            {"message_id": m["id"], "text": m["content"][:2000]}
+            {"message_id": m["id"], "text": m["content"][:800]}
             for m in user_messages
         ]
         prompt = (
