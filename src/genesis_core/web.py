@@ -14,6 +14,7 @@ from genesis_core.missions import MissionError, MissionStore
 from genesis_core.mission_engine import MissionEngine, MissionEngineError
 from genesis_core.memory import MemoryError, MemoryStore
 from genesis_core.conversation_memory import ConversationMemoryEngine, ConversationMemoryError
+from genesis_core.knowledge import KnowledgeError, KnowledgeStore
 from genesis_core.state import StateStore
 from genesis_core.tools import ToolError
 
@@ -25,6 +26,7 @@ mission_store = MissionStore(state=store)
 mission_engine = MissionEngine(store, mission_store, agent)
 memory_store = MemoryStore(store)
 conversation_memory = ConversationMemoryEngine(store, memory_store)
+knowledge_store = KnowledgeStore(store)
 
 
 class SessionInput(BaseModel):
@@ -47,6 +49,18 @@ class MissionStatusInput(BaseModel):
 
 class MemoryCandidateDecisionInput(BaseModel):
     decision: str
+
+
+class KnowledgeDocumentInput(BaseModel):
+    title: str = Field(min_length=1, max_length=240)
+    content: str = Field(min_length=1, max_length=1000000)
+    source_uri: str = Field(default="", max_length=1000)
+    metadata: dict = Field(default_factory=dict)
+
+
+class KnowledgeSearchInput(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+    limit: int = Field(default=8, ge=1, le=30)
 
 
 class MemoryInput(BaseModel):
@@ -208,6 +222,38 @@ def review_memory_candidate(candidate_id: str, payload: MemoryCandidateDecisionI
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+@app.get("/api/knowledge/documents")
+def list_knowledge_documents() -> dict:
+    return {"documents": knowledge_store.list_documents()}
+
+
+@app.post("/api/knowledge/documents")
+def add_knowledge_document(payload: KnowledgeDocumentInput) -> dict:
+    try:
+        return {"document": knowledge_store.ingest_text(
+            payload.title, payload.content, payload.source_uri, payload.metadata
+        )}
+    except KnowledgeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.delete("/api/knowledge/documents/{document_id}")
+def delete_knowledge_document(document_id: str) -> dict:
+    try:
+        knowledge_store.delete_document(document_id)
+        return {"deleted": document_id}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Knowledge document not found") from exc
+
+
+@app.post("/api/knowledge/search")
+def search_knowledge(payload: KnowledgeSearchInput) -> dict:
+    try:
+        return {"results": knowledge_store.search(payload.query, payload.limit)}
+    except KnowledgeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @app.get("/api/memories")
 def list_memories(memory_type: str | None = None, status: str = "active") -> dict:
     try:
@@ -298,7 +344,7 @@ button,input{font:inherit}button{cursor:pointer;color:inherit}.app{height:100vh;
 .welcome h1{font-size:28px;letter-spacing:.03em;margin:0 0 10px}.welcome p{color:var(--muted);line-height:1.7}
 .msg{max-width:82%;padding:13px 15px;border:1px solid var(--line);background:#101827;border-radius:12px;line-height:1.6;white-space:pre-wrap}.msg.user{align-self:flex-end;background:#13251f;border-color:#285b4c}.role{font-size:10px;letter-spacing:.12em;color:var(--mint);margin-bottom:6px}
 .composer{padding:16px max(22px,calc((100% - 760px)/2)) 22px;border-top:1px solid var(--line)}.inputbox{display:flex;gap:10px;background:#101827;border:1px solid #2a3850;border-radius:12px;padding:9px}.inputbox input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--text);padding:8px}.send{background:#1b5b4b;color:#d9fff3;border:0;border-radius:8px;padding:0 17px}.hint{color:#65748c;font-size:10px;margin:9px 4px 0}
-.card{background:#111a28;border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:10px}.card h3{font-size:11px;letter-spacing:.1em;margin:0 0 12px;color:#a9b7cc}.kv{display:flex;justify-content:space-between;gap:8px;font-size:11px;margin:9px 0;color:var(--muted)}.kv b{color:#dce7f8;font-weight:500;text-align:right}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#67748a;margin-right:6px}.dot.ok{background:var(--mint)}.notice{color:#aab6c9;font-size:11px;line-height:1.6}.mission-row{border-top:1px solid var(--line);padding:9px 0;font-size:11px}.mission-row strong{display:block;color:#dce7f8;font-weight:550;margin-bottom:4px}.mission-row span{color:var(--muted)}.mission-create{display:flex;gap:6px;margin-top:10px}.mission-create input{width:100%;min-width:0;background:#0b111c;border:1px solid var(--line);border-radius:7px;padding:8px;color:var(--text)}.mission-create button{border:0;border-radius:7px;background:#1b5b4b;padding:0 10px;color:#eafff8}.mission-actions{display:flex;gap:6px;margin-top:7px}.mission-actions button{border:1px solid var(--line);background:#172334;color:#c9d7eb;border-radius:6px;padding:5px 8px;font-size:10px}.mission-actions button.primary{background:#174b3e;border-color:#286b58;color:#cffff0}
+.card{background:#111a28;border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:10px}.card h3{font-size:11px;letter-spacing:.1em;margin:0 0 12px;color:#a9b7cc}.kv{display:flex;justify-content:space-between;gap:8px;font-size:11px;margin:9px 0;color:var(--muted)}.kv b{color:#dce7f8;font-weight:500;text-align:right}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#67748a;margin-right:6px}.dot.ok{background:var(--mint)}.notice{color:#aab6c9;font-size:11px;line-height:1.6}.mission-row{border-top:1px solid var(--line);padding:9px 0;font-size:11px}.mission-row strong{display:block;color:#dce7f8;font-weight:550;margin-bottom:4px}.mission-row span{color:var(--muted)}.mission-create{display:flex;gap:6px;margin-top:10px}.mission-create input{width:100%;min-width:0;background:#0b111c;border:1px solid var(--line);border-radius:7px;padding:8px;color:var(--text)}.mission-create button{border:0;border-radius:7px;background:#1b5b4b;padding:0 10px;color:#eafff8}.mission-actions{display:flex;gap:6px;margin-top:7px}.mission-actions button{border:1px solid var(--line);background:#172334;color:#c9d7eb;border-radius:6px;padding:5px 8px;font-size:10px}.mission-actions button.primary{background:#174b3e;border-color:#286b58;color:#cffff0}.right input,.right select,.right textarea{width:100%;min-width:0;background:#0b111c;border:1px solid var(--line);border-radius:7px;padding:8px;color:var(--text);margin:4px 0}.right textarea{min-height:105px;resize:vertical;line-height:1.5}
 @media(max-width:950px){.app{grid-template-columns:210px 1fr}.top{grid-column:1/3}.right{display:none}}
 @media(max-width:620px){.app{grid-template-columns:1fr}.top{grid-column:1}.left{display:none}.topmeta .pill{display:none}.centerhead{padding:0 14px}.messages{padding:18px 14px}.composer{padding:12px 14px}}
 </style>
@@ -309,7 +355,7 @@ button,input{font:inherit}button{cursor:pointer;color:inherit}.app{height:100vh;
 <main class="center"><div class="centerhead"><div><strong id="active-title">New conversation</strong><div class="sub" id="active-sub">Shared GENESIS session</div></div><span class="pill">ENGINE FOUNDATION</span></div>
 <div class="messages" id="messages"><div class="welcome" id="welcome"><div class="orb">✧</div><h1>GENESIS CORE</h1><p>Your workspace for research, reasoning, tools and evolving skills.<br>Create a conversation to begin building your project context.</p></div></div>
 <div class="composer"><div class="inputbox"><input id="message-input" placeholder="Write a message to GENESIS…" autocomplete="off"><button class="send" id="send">Send ↗</button></div><div class="hint">Messages are shared with GENESIS TUI. Connect a supported model runtime to receive AI responses.</div></div></main>
-<aside class="right"><div class="section">SYSTEM OVERVIEW</div><div class="card"><h3>AGENT ENGINE</h3><div class="kv"><span>Status</span><b>Foundation only</b></div><div class="kv"><span>Inference</span><b>Agent runtime active</b></div><div class="kv"><span>Sessions</span><b id="session-count">0</b></div></div><div class="card"><h3>MODEL RUNTIMES</h3><div id="runtimes" class="notice">Loading…</div></div><div class="card"><h3>MISSION CONTROL</h3><div id="missions" class="notice">Loading missions…</div><div class="mission-create"><input id="mission-title" placeholder="New mission title"><button id="create-mission">＋</button></div></div><div class="card"><h3>CONVERSATION MEMORY REVIEW</h3><p class="notice">Extract suggestions from user messages in the open conversation. Nothing is saved until you accept it.</p><button id="extract-memories" class="primary">Analyze open conversation</button><div id="memory-candidates" class="notice">No proposals loaded.</div></div><div class="card"><h3>LONG-TERM MEMORY</h3><select id="memory-type"><option value="semantic">Semantic fact</option><option value="episodic">Episode</option><option value="procedural">Procedure</option></select><input id="memory-content" placeholder="Add a verified memory"><input id="memory-source" placeholder="Source / reference (optional)"><button id="save-memory" class="primary">Save memory</button><div id="memories" class="notice">Loading memories…</div></div><div class="card"><h3>DESIGN PRINCIPLE</h3><p class="notice">Ollama, llama.cpp, LM Studio and remote APIs are interchangeable backends. GENESIS owns the interface, memory, tools, permissions and agent workflow.</p></div></aside>
+<aside class="right"><div class="section">SYSTEM OVERVIEW</div><div class="card"><h3>AGENT ENGINE</h3><div class="kv"><span>Status</span><b>Foundation only</b></div><div class="kv"><span>Inference</span><b>Agent runtime active</b></div><div class="kv"><span>Sessions</span><b id="session-count">0</b></div></div><div class="card"><h3>MODEL RUNTIMES</h3><div id="runtimes" class="notice">Loading…</div></div><div class="card"><h3>MISSION CONTROL</h3><div id="missions" class="notice">Loading missions…</div><div class="mission-create"><input id="mission-title" placeholder="New mission title"><button id="create-mission">＋</button></div></div><div class="card"><h3>CONVERSATION MEMORY REVIEW</h3><p class="notice">Extract suggestions from user messages in the open conversation. Nothing is saved until you accept it.</p><button id="extract-memories" class="primary">Analyze open conversation</button><div id="memory-candidates" class="notice">No proposals loaded.</div></div><div class="card"><h3>KNOWLEDGE BASE</h3><input id="knowledge-title" placeholder="Document title"><input id="knowledge-source" placeholder="Source / file reference (optional)"><textarea id="knowledge-content" placeholder="Paste document text or Markdown here"></textarea><button id="knowledge-add" class="primary">Index document</button><input id="knowledge-query" placeholder="Search indexed knowledge"><button id="knowledge-search">Search knowledge</button><div id="knowledge-results" class="notice">No search performed.</div><div id="knowledge-documents" class="notice">Loading documents…</div></div><div class="card"><h3>LONG-TERM MEMORY</h3><select id="memory-type"><option value="semantic">Semantic fact</option><option value="episodic">Episode</option><option value="procedural">Procedure</option></select><input id="memory-content" placeholder="Add a verified memory"><input id="memory-source" placeholder="Source / reference (optional)"><button id="save-memory" class="primary">Save memory</button><div id="memories" class="notice">Loading memories…</div></div><div class="card"><h3>DESIGN PRINCIPLE</h3><p class="notice">Ollama, llama.cpp, LM Studio and remote APIs are interchangeable backends. GENESIS owns the interface, memory, tools, permissions and agent workflow.</p></div></aside>
 </div>
 <script>
 let activeId=null;
@@ -320,6 +366,9 @@ async function loadSessions(){const data=await api('/api/sessions');$('sessions'
 async function openSession(id){activeId=id;const data=await api('/api/sessions/'+id+'/messages');$('messages').replaceChildren();for(const m of data.messages)addMessage(m);if(!data.messages.length){const p=document.createElement('p');p.className='notice';p.textContent='This conversation is ready. Send a message to save it.';$('messages').append(p)}const list=await api('/api/sessions');const s=list.sessions.find(x=>x.id===id);$('active-title').textContent=s?.title||'Conversation';$('active-sub').textContent='Session '+id+' · shared with GENESIS TUI';await loadSessions()}
 async function newSession(){const data=await api('/api/sessions',{method:'POST',body:JSON.stringify({title:'New conversation'})});await openSession(data.session.id)}
 async function sendMessage(){const input=$('message-input');const content=input.value.trim();if(!content)return;if(!activeId)await newSession();input.value='';const data=await api('/api/sessions/'+activeId+'/messages',{method:'POST',body:JSON.stringify({content})});const welcome=$('welcome');if(welcome)welcome.remove();addMessage(data.message);if(data.assistant_message){addMessage(data.assistant_message);const note=document.createElement('div');note.className='hint';note.textContent='Answered by '+data.provider+' · '+data.model;$('messages').append(note)}$('messages').scrollTop=$('messages').scrollHeight;await loadSessions();const s=(await api('/api/sessions')).sessions.find(x=>x.id===activeId);$('active-title').textContent=s?.title||'Conversation'}
+async function loadKnowledgeDocuments(){const data=await api('/api/knowledge/documents');const box=$('knowledge-documents');box.replaceChildren();if(!data.documents.length){box.textContent='No indexed documents.';return}for(const d of data.documents){const row=document.createElement('div');row.className='mission-row';const body=document.createElement('div');body.textContent=d.title+' · '+d.chunk_count+' chunks'+(d.source_uri?' · '+d.source_uri:'');const del=document.createElement('button');del.textContent='Remove';del.onclick=async()=>{if(confirm('Remove this document from the knowledge base?')){await api('/api/knowledge/documents/'+d.id,{method:'DELETE'});await loadKnowledgeDocuments()}};row.append(body,del);box.append(row)}}
+async function addKnowledgeDocument(){const title=$('knowledge-title').value.trim(),content=$('knowledge-content').value.trim();if(!title||!content)return;const data=await api('/api/knowledge/documents',{method:'POST',body:JSON.stringify({title,content,source_uri:$('knowledge-source').value})});alert('Indexed '+data.document.chunk_count+' chunk(s).'+(data.document.duplicate?' This content was already indexed.':''));$('knowledge-content').value='';await loadKnowledgeDocuments()}
+async function searchKnowledge(){const query=$('knowledge-query').value.trim();if(!query)return;const data=await api('/api/knowledge/search',{method:'POST',body:JSON.stringify({query,limit:8})});const box=$('knowledge-results');box.replaceChildren();if(!data.results.length){box.textContent='No matching knowledge found.';return}for(const result of data.results){const row=document.createElement('div');row.className='mission-row';const body=document.createElement('div');body.textContent=result.excerpt+'\\nSource: '+result.citation.title+' · chunk '+result.citation.chunk+' · '+result.citation.source;row.append(body);box.append(row)}}
 async function extractConversationMemories(){if(!activeId){alert('Open a conversation first.');return}try{const data=await api('/api/sessions/'+activeId+'/memory-extract',{method:'POST'});alert('Created '+data.candidates.length+' pending proposal(s). Review them below.');await loadMemoryCandidates()}catch(e){alert(e.message)}}
 async function reviewMemoryCandidate(id,decision){try{const data=await api('/api/memory-candidates/'+id,{method:'POST',body:JSON.stringify({decision})});alert('Proposal '+data.candidate.status+'.');await loadMemoryCandidates();await loadMemories()}catch(e){alert(e.message)}}
 async function loadMemoryCandidates(){const data=await api('/api/memory-candidates');const box=$('memory-candidates');box.replaceChildren();if(!data.candidates.length){box.textContent='No pending proposals.';return}for(const item of data.candidates){const row=document.createElement('div');row.className='mission-row';const body=document.createElement('div');body.textContent='['+item.memory_type+'] '+item.content+'\\nEvidence: “'+item.evidence+'”';const actions=document.createElement('div');actions.className='mission-actions';const accept=document.createElement('button');accept.textContent='Accept';accept.onclick=()=>reviewMemoryCandidate(item.id,'accept');const reject=document.createElement('button');reject.textContent='Reject';reject.onclick=()=>reviewMemoryCandidate(item.id,'reject');actions.append(accept,reject);row.append(body,actions);box.append(row)}}
@@ -328,6 +377,6 @@ async function saveMemory(){const content=$('memory-content').value.trim();if(!c
 async function loadMissions(){const data=await api('/api/missions');$('missions').replaceChildren();if(!data.missions.length){$('missions').textContent='No missions yet.';return}for(const m of data.missions){const row=document.createElement('div');row.className='mission-row';const title=document.createElement('strong');title.textContent=m.title;const meta=document.createElement('span');meta.textContent=m.status+' · priority '+m.priority;const actions=document.createElement('div');actions.className='mission-actions';const run=document.createElement('button');run.className='primary';run.textContent='Run next step';run.onclick=async()=>{try{const result=await api('/api/missions/'+m.id+'/run',{method:'POST'});const detail=result.task?('Step '+result.task.position+': '+result.task.status+' — '+result.task.title):'Mission '+result.mission.status;alert(detail+(result.task&&result.task.result?'\\n\\n'+result.task.result:''));await loadMissions()}catch(e){alert(e.message)}};const tasks=document.createElement('button');tasks.textContent='View tasks';tasks.onclick=async()=>{try{const result=await api('/api/missions/'+m.id+'/tasks');alert(result.tasks.length?result.tasks.map(t=>t.position+'. ['+t.status+'] '+t.title+(t.result?'\\n'+t.result:'' )).join('\\n\\n'):'No plan yet. Press Run next step to generate one.')}catch(e){alert(e.message)}};actions.append(run,tasks);if(m.status==='completed'){const remember=document.createElement('button');remember.textContent='Save episode';remember.onclick=async()=>{try{const result=await api('/api/memories/from-mission/'+m.id,{method:'POST'});alert('Saved episodic memory '+result.memory.id);await loadMemories()}catch(e){alert(e.message)}};actions.append(remember)}row.append(title,meta,actions);$('missions').append(row)}}
 async function createMission(){const input=$('mission-title');const title=input.value.trim();if(!title)return;await api('/api/missions',{method:'POST',body:JSON.stringify({title,priority:3})});input.value='';await loadMissions()}
 async function loadStatus(){const s=await api('/api/status');$('version').textContent=s.version;const online=s.model_runtimes.filter(x=>x.available).length;$('model-count').textContent=online+' runtime(s) online';$('runtimes').replaceChildren();for(const r of s.model_runtimes){const row=document.createElement('div');row.className='kv';const name=document.createElement('span');name.textContent=r.provider.replace('_',' ');const state=document.createElement('b');state.innerHTML='<span class="dot '+(r.available?'ok':'')+'"></span>'+ (r.available?'Online':'Offline');row.append(name,state);$('runtimes').append(row)}}
-$('new-session').onclick=()=>newSession();$('send').onclick=()=>sendMessage().catch(e=>alert(e.message));$('message-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendMessage().catch(x=>alert(x.message))});$('refresh').onclick=()=>Promise.all([loadStatus(),loadMissions()]).catch(e=>alert(e.message));$('create-mission').onclick=()=>createMission().catch(e=>alert(e.message));$('save-memory').onclick=()=>saveMemory().catch(e=>alert(e.message));$('extract-memories').onclick=()=>extractConversationMemories();$('mission-title').addEventListener('keydown',e=>{if(e.key==='Enter')createMission().catch(x=>alert(x.message))});
-Promise.all([loadSessions(),loadStatus(),loadMissions(),loadMemories(),loadMemoryCandidates()]).then(()=>{}).catch(e=>console.error(e));
+$('new-session').onclick=()=>newSession();$('send').onclick=()=>sendMessage().catch(e=>alert(e.message));$('message-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendMessage().catch(x=>alert(x.message))});$('refresh').onclick=()=>Promise.all([loadStatus(),loadMissions()]).catch(e=>alert(e.message));$('create-mission').onclick=()=>createMission().catch(e=>alert(e.message));$('save-memory').onclick=()=>saveMemory().catch(e=>alert(e.message));$('knowledge-add').onclick=()=>addKnowledgeDocument().catch(e=>alert(e.message));$('knowledge-search').onclick=()=>searchKnowledge().catch(e=>alert(e.message));$('extract-memories').onclick=()=>extractConversationMemories();$('mission-title').addEventListener('keydown',e=>{if(e.key==='Enter')createMission().catch(x=>alert(x.message))});
+Promise.all([loadSessions(),loadStatus(),loadMissions(),loadMemories(),loadMemoryCandidates(),loadKnowledgeDocuments()]).then(()=>{}).catch(e=>console.error(e));
 </script></body></html>"""
