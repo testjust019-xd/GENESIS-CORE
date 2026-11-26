@@ -6,7 +6,7 @@ import json
 import os
 import shlex
 from pathlib import Path
-from genesis_core.agent import AgentRuntime, ModelError
+from genesis_core.agent import AgentRuntime, ModelError, build_default_tool_executor
 from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
 from genesis_core.state import StateStore
@@ -24,7 +24,8 @@ BANNER = r"""
 
 def run_tui() -> int:
     store = StateStore()
-    agent = AgentRuntime(store=store)
+    tool_executor, approvals = build_default_tool_executor(store)
+    agent = AgentRuntime(store=store, tool_executor=tool_executor)
     missions = MissionStore(state=store)
     genesis_home = Path(os.environ.get("GENESIS_HOME", Path.home() / ".genesis"))
     approvals = ApprovalStore(store.database_path)
@@ -59,6 +60,11 @@ def run_tui() -> int:
             try:
                 reply = agent.chat(current, raw)
                 print(f"\nGENESIS [{reply.provider}/{reply.model}]")
+                for event in reply.activity:
+                    if event["type"] == "tool":
+                        print(f"  [EXECUTOR] {event['tool']} -> {event['status']}")
+                    elif event["type"] in {"tool_error", "error", "limit", "loop_guard"}:
+                        print(f"  [OBSERVER] {event.get('detail', event['type'])}")
                 print(reply.assistant_message["content"])
                 print()
             except ModelError as exc:
@@ -84,6 +90,9 @@ def run_tui() -> int:
                 "  /open <id>         Switch conversation\n"
                 "  /history           Show current conversation\n"
                 "  /models            Inspect local model runtimes\n"
+                "  /tools             List available agent tools\n"
+                "  /approvals         List pending tool approvals\n"
+                "  /approval <id> approve|reject  Decide a pending approval\n"
                 "  /missions          List missions\n"
                 "  /mission new <title>  Create a mission\n"
                 "  /mission status <id> <status>  Update mission status\n"
