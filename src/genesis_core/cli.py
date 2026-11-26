@@ -102,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
         print("GENESIS CORE — LOCAL MODEL RUNTIMES")
         for runtime in discover_runtimes():
             state = "ONLINE" if runtime.available else "OFFLINE"
-            print(f"\\n{runtime.provider}: {state} — {runtime.base_url}")
+            print(f"\n{runtime.provider}: {state} — {runtime.base_url}")
             print(f"  {runtime.detail}")
             for model in runtime.models:
                 print(f"  • {model}")
