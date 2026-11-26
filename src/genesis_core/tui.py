@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shlex
 from pathlib import Path
@@ -117,6 +118,22 @@ def run_tui() -> int:
                 print(f"{runtime.provider}: {status} — {runtime.detail}")
                 for model in runtime.models:
                     print(f"  • {model}")
+        elif command == "/tool":
+            try:
+                raw_parts = raw.split(maxsplit=2)
+                if len(raw_parts) < 2:
+                    print("Usage: /tool <name> [JSON arguments]")
+                    continue
+                tool_name = raw_parts[1]
+                tool_arguments = json.loads(raw_parts[2]) if len(raw_parts) == 3 else {}
+                result = tool_executor.execute(tool_name, tool_arguments)
+                print(json.dumps({
+                    "tool": result.tool, "status": result.status,
+                    "output": result.output, "approval_id": result.approval_id,
+                    "reason": result.reason,
+                }, indent=2, ensure_ascii=False))
+            except (ValueError, TypeError, Exception) as exc:
+                print(f"Tool error: {exc}")
         elif command == "/tools":
             for tool in tool_registry.list():
                 print(f"{tool['name']} [{tool['risk']}] — {tool['description']}")
