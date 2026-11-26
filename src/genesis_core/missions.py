@@ -124,7 +124,7 @@ class MissionStore:
             else:
                 rows = db.execute(
                     "SELECT * FROM missions ORDER BY priority ASC, updated_at DESC LIMIT ?",
-                    (max(1, min(limit, 500))),
+                    (max(1, min(limit, 500)),),
                 ).fetchall()
         return [dict(row) for row in rows]
 
