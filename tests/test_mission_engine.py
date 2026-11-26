@@ -31,7 +31,9 @@ def test_mission_plan_is_persisted_and_steps_run_one_at_a_time(tmp_path):
             {"title": "Summarise findings", "instructions": "Write a concise summary."},
         ]}),
         "The project contains a CLI and a web interface.",
+        json.dumps({"status": "completed", "summary": "The project structure was inspected."}),
         "The report summary is ready.",
+        json.dumps({"status": "completed", "summary": "The report summary is present."}),
     ])
     agent = AgentRuntime(store=state, adapter=adapter)
     engine = MissionEngine(state, missions, agent)
@@ -99,3 +101,41 @@ def test_mission_task_limit_is_enforced(tmp_path):
     with pytest.raises(MissionEngineError):
         engine.plan(mission["id"])
     assert missions.list_tasks(mission["id"]) == []
+
+def test_observer_blocks_unverified_task_completion(tmp_path):
+    state = StateStore(tmp_path / "genesis.db")
+    missions = MissionStore(state)
+    mission = missions.create("Research uncertain topic")
+    adapter = ScriptedAdapter([
+        json.dumps({"tasks": [
+            {"title": "Verify claim", "instructions": "Find reliable evidence for the claim."}
+        ]}),
+        "I could not access reliable sources.",
+        json.dumps({"status": "blocked", "summary": "No reliable evidence was available."}),
+    ])
+    engine = MissionEngine(state, missions, AgentRuntime(store=state, adapter=adapter))
+
+    result = engine.run_next(mission["id"])
+
+    assert result["task"]["status"] == "blocked"
+    assert result["mission"]["status"] == "blocked"
+    assert "No reliable evidence" in result["observation"]["summary"]
+
+
+def test_invalid_observer_output_fails_closed(tmp_path):
+    state = StateStore(tmp_path / "genesis.db")
+    missions = MissionStore(state)
+    mission = missions.create("Unverified task")
+    adapter = ScriptedAdapter([
+        json.dumps({"tasks": [
+            {"title": "Check result", "instructions": "Check the result."}
+        ]}),
+        "Done.",
+        "not-json",
+    ])
+    engine = MissionEngine(state, missions, AgentRuntime(store=state, adapter=adapter))
+
+    result = engine.run_next(mission["id"])
+
+    assert result["task"]["status"] == "blocked"
+    assert result["mission"]["status"] == "blocked"
