@@ -25,7 +25,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 
 ## Milestone 2 — Agent runtime
 - [x] Basic context-aware chat loop (initial)
-- [ ] Mission and goal representation
+- [x] Persistent mission and goal representation (initial CRUD and status transitions)
 - [ ] Planner / executor / observer loop
 - [ ] Tool registry with JSON schemas
 - [ ] Permission profiles and approval workflow
