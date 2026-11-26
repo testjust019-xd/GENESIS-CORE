@@ -66,8 +66,14 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [ ] Knowledge graph, entity links and contradiction tracking
 
 ## Milestone 4 — Research and multimodal tools
-- [ ] Search providers and browser workflow
-- [ ] Source verification and citation storage
+- [x] Search provider interface with optional SearXNG and Brave adapters (initial)
+- [x] Offline fallback to the local Knowledge Engine
+- [x] Persistent research runs and source vault
+- [x] Source provenance, URL deduplication and pending/approved/rejected review states
+- [x] TUI, Studio and API research workflows (initial)
+- [ ] Browser page retrieval and extraction with safe URL validation
+- [ ] Multi-source claim comparison and citation-backed reports
+- [ ] Automated source freshness and cross-check signals
 - [ ] PDF / document extraction
 - [ ] Image analysis adapters
 - [ ] Audio transcription and analysis
