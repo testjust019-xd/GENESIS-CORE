@@ -124,13 +124,16 @@ class MissionEngine:
         mission = self.missions.get(mission_id)
         if mission is None:
             raise KeyError(mission_id)
+        if mission["status"] in {"failed", "cancelled"}:
+            raise MissionEngineError(f"Mission is {mission['status']} and cannot be resumed.")
         tasks = self.missions.list_tasks(mission_id)
         if not tasks:
             planned = self.plan(mission_id)
             tasks = planned["tasks"]
             mission = planned["mission"]
 
-        task = next((item for item in tasks if item["status"] in {"planned", "blocked"}), None)
+        task = next((item for item in tasks if item["status"] in {"planned", "blocked", "running"}), None)
+        was_interrupted = bool(task and task["status"] == "running")
         if task is None:
             if all(item["status"] == "completed" for item in tasks):
                 mission = self.missions.set_status(mission_id, "completed")
@@ -146,7 +149,8 @@ class MissionEngine:
             f"MISSION OBJECTIVE: {mission['description'] or mission['title']}\n"
             f"CURRENT STEP {task['position']}: {task['title']}\n"
             f"INSTRUCTIONS: {task['instructions']}\n"
-            "Work only on this step. Use only available GENESIS tools and permissions. "
+            + ("This task was interrupted during a previous run. Inspect the conversation history and avoid repeating work already confirmed.\n" if was_interrupted else "")
+            + "Work only on this step. Use only available GENESIS tools and permissions. "
             "Do not claim external work was done without evidence. Give a concise result "
             "and explicitly state if blocked or if user input is required."
         )
