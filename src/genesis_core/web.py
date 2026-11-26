@@ -215,6 +215,29 @@ def run_mission_step(mission_id: str) -> dict:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@app.post("/api/missions/{mission_id}/replan")
+def replan_mission(mission_id: str, payload: dict | None = None) -> dict:
+    reason = ""
+    if payload is not None:
+        reason = str(payload.get("reason", ""))[:2000]
+    try:
+        return mission_engine.replan(mission_id, reason)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Mission not found") from exc
+    except (MissionError, MissionEngineError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ModelError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/missions/{mission_id}/plan-history")
+def mission_plan_history(mission_id: str) -> dict:
+    try:
+        return {"revisions": mission_engine.plan_history(mission_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Mission not found") from exc
+
+
 @app.post("/api/memories/from-mission/{mission_id}")
 def capture_mission_memory(mission_id: str) -> dict:
     try:
