@@ -450,6 +450,12 @@ class ResearchEngine:
                      review_status: str | None = None) -> list[dict[str, Any]]:
         return self.store.list_sources(run_id, review_status)
 
+    def fetch_source_page(self, source_id: str) -> dict[str, Any]:
+        return self.store.fetch_source_page(source_id)
+
+    def get_source_page(self, source_id: str) -> dict[str, Any]:
+        return self.store.get_source_page(source_id)
+
     def review_source(self, source_id: str, decision: str, note: str = "") -> dict[str, Any]:
         return self.store.decide_source(source_id, decision, note)
 
