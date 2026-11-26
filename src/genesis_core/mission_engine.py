@@ -193,6 +193,8 @@ class MissionEngine:
         return {
             "mission": self.missions.get(mission_id), "tasks": revised,
             "plan": metadata, "preserved_completed": len(completed), "replanned": True,
+            "specialist_run_id": collaboration["run_id"] if collaboration else None,
+            "specialists": [step["role"] for step in collaboration["steps"]] if collaboration else [],
         }
 
     def plan_history(self, mission_id: str) -> list[dict[str, Any]]:
