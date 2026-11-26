@@ -106,10 +106,10 @@ class ConversationMemoryEngine:
             kind = candidate.get("memory_type")
             content = candidate.get("content")
             evidence = candidate.get("evidence")
-            if kind not in MEMORY_TYPES or not isinstance(content, str) or not isinstance(evidence, str):
+            if not isinstance(kind, str) or kind not in MEMORY_TYPES or not isinstance(content, str) or not isinstance(evidence, str):
                 continue
             content, evidence = content.strip(), evidence.strip()
-            if not content or len(content) > 500 or not evidence or len(evidence) > 1200:
+            if not content or len(content) > 500 or len(evidence) < 8 or len(evidence) > 1200:
                 continue
             matching_ids = [
                 str(m["id"]) for m in user_messages
