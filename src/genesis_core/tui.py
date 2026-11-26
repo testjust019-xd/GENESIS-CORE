@@ -211,7 +211,7 @@ def run_tui() -> int:
                     print(f"Memory {args[1]} deleted.")
                 else:
                     print("Usage: /memory list [type] | search <text> | add <episodic|semantic|procedural> <text> | mission <id> | extract [session-id] | candidates [session-id] | candidate <id> accept|reject | off|delete <id>")
-            except (MemoryError, ConversationMemoryError, KeyError) as exc:
+            except (MemoryError, ConversationMemoryError, KeyError, ModelError) as exc:
                 print(f"Memory error: {exc}")
         elif command == "/missions":
             for mission in missions.list():
