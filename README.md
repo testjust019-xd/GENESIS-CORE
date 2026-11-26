@@ -85,7 +85,8 @@ See [docs/INTERFACES.md](docs/INTERFACES.md) for the TUI/Studio contract and [do
 | Agent Runtime | Bounded planner / executor / observer loop over chat adapters | Initial |
 | First-Run Setup | Hardware-aware model recommendations and opt-in Ollama download | Initial |
 | Mission Control | Persistent goals, task plans, step results and resumable execution | Initial |
-| Memory Engine | Explicit episodic, semantic and procedural records; provenance, confidence, retrieval and user controls | Initial |\n| Knowledge Engine | Local document ingestion, chunking, SQLite full-text search and source-linked agent context | Initial |
+| Memory Engine | Explicit episodic, semantic and procedural records; provenance, confidence, retrieval and user controls | Initial |
+| Knowledge Engine | Local document ingestion, chunking, SQLite full-text search and source-linked agent context | Initial |
 | Research Engine | Search, source capture and verification | Planned |
 | Tool System | Schema-validated tools, workspace confinement, approval queue and agent integration | Initial foundation |
 | Multimodal | Image, audio, video and document pipelines | Planned |
