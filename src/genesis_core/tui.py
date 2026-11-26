@@ -99,6 +99,7 @@ def run_tui() -> int:
                 "  /memory list [type]  List active memories\n"
                 "  /memory search <text> Search active memories\n"
                 "  /memory add <type> <text> Save an explicit memory\n"
+                "  /memory mission <id> Capture a completed mission as an episode\n"
                 "  /memory off|delete <id> Deactivate or delete a memory\n"
                 "  /missions          List missions\n"
                 "  /mission new <title>  Create a mission\n"
