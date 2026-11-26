@@ -81,8 +81,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("doctor", help="inspect host resources and runtime environment")
     subparsers.add_parser("init", help="create the local GENESIS data directory")
     subparsers.add_parser("models", help="discover local model runtimes and available models")
+    subparsers.add_parser("tui", help="open the interactive GENESIS terminal workspace")
 
-    serve = subparsers.add_parser("serve", help="start the local web dashboard")
+    serve = subparsers.add_parser("studio", aliases=["serve"], help="open GENESIS Studio in your browser")
     serve.add_argument("--host", default="127.0.0.1", help="bind address (default: localhost only)")
     serve.add_argument("--port", type=int, default=8765, help="port (default: 8765)")
 
@@ -93,6 +94,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    if args.command == "tui":
+        from genesis_core.tui import run_tui
+
+        return run_tui()
     if args.command == "doctor":
         _print_hardware()
         return 0
@@ -107,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
             for model in runtime.models:
                 print(f"  • {model}")
         return 0
-    if args.command == "serve":
+    if args.command in {"studio", "serve"}:
         try:
             import uvicorn
         except ImportError:
@@ -115,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         from genesis_core.web import app
 
-        print(f"GENESIS dashboard: http://{args.host}:{args.port}")
+        print(f"GENESIS Studio: http://{args.host}:{args.port}")
         uvicorn.run(app, host=args.host, port=args.port, log_level="info")
         return 0
 
