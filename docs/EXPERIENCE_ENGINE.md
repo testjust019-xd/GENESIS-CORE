@@ -21,7 +21,8 @@ The initial lifecycle is `captured → reviewed → archived`.
 
 - A captured result is an experience record, not automatically a verified fact.
 - The observer is the configured model, not an independent external auditor.
-- The initial confidence value is a neutral placeholder, not a calibrated probability.\n- A completed task does not prove that the strategy generalizes to other tasks.
+- The initial confidence value is a neutral placeholder, not a calibrated probability.
+- A completed task does not prove that the strategy generalizes to other tasks.
 - Experiences are not automatically promoted into semantic/procedural memory.
 - They are not automatically converted into training data or model updates.
 - Future skill proposals must be evaluated against reproducible tests before activation.
