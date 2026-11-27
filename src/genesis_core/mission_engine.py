@@ -304,7 +304,7 @@ class MissionEngine:
             outcome=task_status,
             result=output,
             observer_summary=observation["summary"],
-            confidence=0.8 if task_status == "completed" else 0.4,
+            confidence=0.5,
         )
         updated_tasks = self.missions.list_tasks(mission_id)
         if task_status == "blocked":
