@@ -7,9 +7,10 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from genesis_core.state import StateStore
 
@@ -28,10 +29,18 @@ class ExperienceStore:
         self.database_path: Path = (state or StateStore()).database_path
         self._initialise()
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         db = sqlite3.connect(self.database_path, timeout=10)
         db.row_factory = sqlite3.Row
-        return db
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     def _initialise(self) -> None:
         with self._connect() as db:
@@ -85,7 +94,7 @@ class ExperienceStore:
         }
         if any(not isinstance(value, str) or not value.strip() for value in required.values()):
             raise ExperienceError("Experience fields must be non-empty text.")
-        if outcome not in EXPERIENCE_OUTCOMES:
+        if not isinstance(outcome, str) or outcome not in EXPERIENCE_OUTCOMES:
             raise ExperienceError(f"Unsupported experience outcome: {outcome}")
         if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
             raise ExperienceError("Confidence must be a number between 0 and 1.")
@@ -129,9 +138,13 @@ class ExperienceStore:
         outcome: str | None = None,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
-        if status is not None and status not in EXPERIENCE_STATUSES:
+        if status is not None and (
+            not isinstance(status, str) or status not in EXPERIENCE_STATUSES
+        ):
             raise ExperienceError(f"Unsupported experience status: {status}")
-        if outcome is not None and outcome not in EXPERIENCE_OUTCOMES:
+        if outcome is not None and (
+            not isinstance(outcome, str) or outcome not in EXPERIENCE_OUTCOMES
+        ):
             raise ExperienceError(f"Unsupported experience outcome: {outcome}")
         clauses: list[str] = []
         values: list[Any] = []
@@ -151,7 +164,7 @@ class ExperienceStore:
         return [dict(row) for row in rows]
 
     def set_status(self, experience_id: str, status: str) -> dict[str, Any]:
-        if status not in EXPERIENCE_STATUSES:
+        if not isinstance(status, str) or status not in EXPERIENCE_STATUSES:
             raise ExperienceError(f"Unsupported experience status: {status}")
         with self._connect() as db:
             cursor = db.execute(
