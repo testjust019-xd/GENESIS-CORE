@@ -96,26 +96,107 @@ def box(lines: Iterable[str], title: str = "", width: int | None = None,
     return "\n".join(out)
 
 
+AVATAR_ART = (
+    " ╭─────╮ ",
+    " │ {e} {e} │ ",
+    " │  {m}  │ ",
+    " ╰─┬─┬─╯ ",
+)
+
+# state -> (eyes, mouth)
+FACES = {
+    "idle": ("◉", "▾"),
+    "thinking": ("◔", "~"),
+    "happy": ("◕", "‿"),
+    "alert": ("◉", "o"),
+    "error": ("✖", "▾"),
+}
+
+
+def avatar_lines(state: str = "idle", enabled: bool | None = None) -> list[str]:
+    """The GENESIS mascot as four lines, 9 columns wide."""
+    eyes, mouth = FACES.get(state, FACES["idle"])
+    style = "bright_yellow" if state == "alert" else "bright_red" if state == "error" else "bright_cyan"
+    rows = []
+    for row in AVATAR_ART:
+        row = row.format(e=eyes, m=mouth)
+        rows.append(paint(row, style, enabled=enabled))
+    return rows
+
+
+def mini_face(state: str = "idle", enabled: bool | None = None) -> str:
+    """One-glyph-wide-ish face used beside replies: ``(◉▾◉)``."""
+    eyes, mouth = FACES.get(state, FACES["idle"])
+    style = "bright_yellow" if state == "alert" else "bright_red" if state == "error" else "bright_cyan"
+    return paint(f"({eyes}{mouth}{eyes})", style, enabled=enabled)
+
+
 def welcome_panel(version: str, session_title: str, model: str, workspace: str,
-                  enabled: bool | None = None) -> str:
-    """Compact Claude-Code-style welcome panel."""
+                  enabled: bool | None = None, width: int | None = None) -> str:
+    """Compact Claude-Code-style welcome panel with the GENESIS avatar."""
     b = lambda s: paint(s, "bold", enabled=enabled)  # noqa: E731
     d = lambda s: paint(s, "dim", enabled=enabled)  # noqa: E731
     c = lambda s: paint(s, "bright_cyan", "bold", enabled=enabled)  # noqa: E731
-    lines = [
-        f"{c('✦ GENESIS CORE')}  {d('v' + version)}",
-        "",
+    info_rows = [
+        f"{c('GENESIS CORE')}  {d('v' + version)}",
         f"{d('session')}    {b(session_title)}",
         f"{d('model')}      {b(model)}",
         f"{d('workspace')}  {workspace}",
     ]
+    width = width or term_width()
+    if width >= 60:
+        art = avatar_lines("idle", enabled)
+        top = [f"{left} {right}" for left, right in zip(art, info_rows)]
+    else:
+        top = info_rows
     tips = [
         "",
         d("Tips"),
         f"  {c('/help')} commands   {c('/new')} conversation   {c('/models')} runtimes",
         f"  {c('Tab')} complete   {c('↑/↓')} history   {c('Ctrl+C')} stop reply   {c('Ctrl+D')} quit",
     ]
-    return box(lines + tips, enabled=enabled)
+    return box(top + tips, width=width, enabled=enabled)
+
+
+def approval_card(request: dict, enabled: bool | None = None, width: int | None = None) -> str:
+    """Boxed description of a gated tool call, shown before asking y/n."""
+    import json as _json
+
+    args = request.get("arguments") or {}
+    try:
+        rendered = _json.dumps(args, ensure_ascii=False)
+    except (TypeError, ValueError):
+        rendered = str(args)
+    lines = [
+        f"{paint('Tool', 'dim', enabled=enabled)}    {paint(str(request.get('tool', '?')), 'bold', enabled=enabled)}",
+        f"{paint('Args', 'dim', enabled=enabled)}    {rendered}",
+    ]
+    if request.get("reason"):
+        lines.append(f"{paint('Why', 'dim', enabled=enabled)}     {request['reason']}")
+    return box(lines, title="Approval needed", width=width, style="bright_yellow", enabled=enabled)
+
+
+def ask_approval(request: dict, input_fn=input, out: TextIO | None = None,
+                 enabled: bool | None = None) -> bool:
+    """Show an approval card and ask ``[y/N]``. Anything but yes (or EOF) declines."""
+    out = out or sys.stdout
+    out.write("\n" + approval_card(request, enabled=enabled) + "\n")
+    out.flush()
+    try:
+        answer = input_fn(paint("  Allow this action? [y/N] ", "bright_yellow", enabled=enabled)).strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        out.write("\n")
+        return False
+    return answer in {"y", "yes", "o", "oui"}
+
+
+def format_tool_start(event: dict, enabled: bool | None = None) -> str:
+    """Live line printed while a tool is running."""
+    args = event.get("arguments") or {}
+    brief = ", ".join(f"{k}={str(v)[:40]!r}" for k, v in list(args.items())[:2])
+    return (paint("  ⚙ ", "bright_cyan", enabled=enabled)
+            + paint(str(event.get("tool", "tool")), "bold", enabled=enabled)
+            + (paint(f"  {brief}", "dim", enabled=enabled) if brief else ""))
 
 
 # --------------------------------------------------------------------------- #
@@ -264,7 +345,7 @@ class MarkdownStream:
 class Spinner:
     """Animated "thinking" indicator written to stderr; silent when not a TTY."""
 
-    FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+    FRAMES = ("(◔▾◔)", "(◔~◔)", "(◑▾◑)", "(◕~◕)", "(◕▾◕)", "(◑~◑)")
 
     def __init__(self, label: str = "Thinking", stream: TextIO | None = None):
         self.label = label
@@ -276,11 +357,16 @@ class Spinner:
         self._lock = threading.Lock()
         self._visible = False
 
-    def __enter__(self) -> "Spinner":
-        if self.active:
+    def start(self) -> None:
+        """(Re)start the animation. Safe after :meth:`stop`."""
+        if self.active and self._thread is None:
+            self._stop = threading.Event()
             self._start = time.monotonic()
             self._thread = threading.Thread(target=self._run, daemon=True)
             self._thread.start()
+
+    def __enter__(self) -> "Spinner":
+        self.start()
         return self
 
     def __exit__(self, *exc) -> None:
@@ -298,7 +384,7 @@ class Spinner:
                     self.stream.flush()
                     self._visible = True
             i += 1
-            self._stop.wait(0.09)
+            self._stop.wait(0.22)
 
     def stop(self) -> None:
         """Stop and erase the spinner line. Safe to call repeatedly."""

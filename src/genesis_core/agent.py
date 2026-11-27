@@ -119,7 +119,21 @@ class AgentRuntime:
             return []
         return self.tool_executor.registry.list()
 
-    def chat(self, session_id: str, content: str, on_token: Callable[[str], None] | None = None) -> AgentReply:
+    def chat(
+        self,
+        session_id: str,
+        content: str,
+        on_token: Callable[[str], None] | None = None,
+        on_activity: Callable[[dict[str, Any]], None] | None = None,
+        on_approval: Callable[[dict[str, Any]], bool] | None = None,
+    ) -> AgentReply:
+        """Run one agent turn.
+
+        ``on_activity`` receives live events (``tool_start`` before a tool runs, then the
+        recorded activity event). ``on_approval`` lets an interactive client decide a
+        gated tool call inline: it receives the request and returns True to approve.
+        Without it, gated calls stop the turn and wait in the approval queue as before.
+        """
         if not self.store.get_session(session_id):
             raise KeyError(session_id)
         if not content.strip():
@@ -268,7 +282,27 @@ class AgentRuntime:
 
             try:
                 approval_id = self.tool_executor.approvals.find_approved(tool_name, arguments)
+                if on_activity:
+                    on_activity({"type": "tool_start", "tool": tool_name, "arguments": arguments})
                 result = self.tool_executor.execute(tool_name, arguments, approval_id=approval_id)
+                if result.status == "approval_required" and on_approval and result.approval_id:
+                    approved = bool(on_approval({
+                        "id": result.approval_id, "tool": result.tool,
+                        "arguments": arguments, "reason": result.reason,
+                    }))
+                    self.tool_executor.approvals.decide(result.approval_id, approved=approved)
+                    if approved:
+                        result = self.tool_executor.execute(
+                            tool_name, arguments, approval_id=result.approval_id)
+                    else:
+                        denied = {"type": "tool", "tool": result.tool, "status": "denied",
+                                  "output": None, "approval_id": result.approval_id,
+                                  "reason": "Declined by the user."}
+                        activity.append(denied)
+                        if on_activity:
+                            on_activity(denied)
+                        answer = f"You declined the {result.tool} action, so I did not run it."
+                        break
             except ToolError as exc:
                 activity.append({"type": "tool_error", "tool": tool_name, "detail": str(exc)})
                 messages.append({
@@ -285,6 +319,8 @@ class AgentRuntime:
                 "reason": result.reason,
             })
             tool_steps += 1
+            if on_activity:
+                on_activity(activity[-1])
 
             if result.status == "approval_required":
                 answer = (

@@ -48,6 +48,8 @@ The TUI uses a dependency-free presentation layer (standard library only, so it 
 - animated "thinking" indicator; **Ctrl+C** cancels a reply and returns to the prompt, **Ctrl+D** quits
 - tool-activity trace after each reply and a pending-approvals notice above the prompt
 - Tab completion for slash commands and sub-commands, persistent input history (`~/.genesis/tui_history`)
+- the GENESIS avatar (idle/thinking/happy/alert/error faces) in the welcome panel, spinner and replies
+- live tool trace while the agent works and inline `[y/N]` approval of gated tools (`on_activity` / `on_approval` callbacks on `AgentRuntime.chat`; clients without them keep the approval queue)
 - grouped, filterable help (`/help <text>`) and `/clear`
 - colour is disabled automatically when output is not a terminal or `NO_COLOR` is set
 

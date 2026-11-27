@@ -86,39 +86,56 @@ def run_tui() -> int:
             spinner = ui.Spinner("Thinking")
             first_token = True
 
+            def reply_header() -> None:
+                print(ui.mini_face("happy") + " " + ui.paint("genesis", "bold", "bright_cyan"))
+
             def on_token(chunk: str) -> None:
                 nonlocal first_token
                 if first_token:
                     spinner.stop()
-                    print(ui.paint("genesis", "bold", "bright_cyan"))
+                    reply_header()
                     first_token = False
                 stream.feed(chunk)
 
+            def on_activity(event: dict) -> None:
+                spinner.stop()
+                stream.finish()
+                if event.get("type") == "tool_start":
+                    print(ui.format_tool_start(event))
+                else:
+                    line = ui.format_activity(event)
+                    if line:
+                        print(line)
+                spinner.start()
+
+            def on_approval(request: dict) -> bool:
+                spinner.stop()
+                stream.finish()
+                return ui.ask_approval(request)
+
             try:
                 with spinner:
-                    reply = agent.chat(current, raw, on_token=on_token)
+                    reply = agent.chat(
+                        current, raw, on_token=on_token,
+                        on_activity=on_activity, on_approval=on_approval,
+                    )
                 spinner.stop()
                 stream.finish()
                 if first_token and reply.assistant_message["content"]:
                     # Adapter produced no streamed tokens: render the final message.
-                    print(ui.paint("genesis", "bold", "bright_cyan"))
+                    reply_header()
                     stream.feed(reply.assistant_message["content"] + "\n")
                     stream.finish()
-                trace = [line for line in (ui.format_activity(e) for e in reply.activity) if line]
-                if trace:
-                    print(ui.paint("  tools", "dim"))
-                    for line in trace:
-                        print(line)
                 print(ui.paint(f"  {reply.provider}/{reply.model}", "gray"))
                 print()
             except KeyboardInterrupt:
                 spinner.stop()
                 stream.finish()
-                print("\n" + ui.warn("Reply cancelled."))
+                print("\n" + ui.mini_face("alert") + " " + ui.warn("Reply cancelled."))
                 print()
             except ModelError as exc:
                 spinner.stop()
-                print(ui.error(f"Model unavailable: {exc}"))
+                print(ui.mini_face("error") + " " + ui.error(f"Model unavailable: {exc}"))
                 print(ui.paint("  Start a local model runtime or set GENESIS_MODEL_PROVIDER / GENESIS_MODEL. Try /models.", "dim"))
                 print()
             continue
