@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from genesis_core.agent import AgentRuntime, ModelError
+from genesis_core.experience import ExperienceStore
 from genesis_core.missions import MissionError, MissionStore
 from genesis_core.multi_agent import MultiAgentEngine
 from genesis_core.state import StateStore
@@ -75,6 +76,7 @@ class MissionEngine:
         self.missions = missions
         self.agent = agent
         self.multi_agent = multi_agent
+        self.experiences = ExperienceStore(store)
 
     def plan(self, mission_id: str) -> dict[str, Any]:
         mission = self.missions.get(mission_id)
@@ -291,6 +293,19 @@ class MissionEngine:
         task_status = observation["status"]
         stored_result = (f"[Specialist: {specialist['id']}]\n" if specialist else "") + output + "\n\nObserver: " + observation["summary"]
         self.missions.set_task_status(task["id"], task_status, result=stored_result)
+        # Preserve the observed attempt as evidence for future, evaluated learning.
+        # Capturing an experience never promotes it to a fact or changes model weights.
+        experience = self.experiences.capture_task_result(
+            mission_id=mission_id,
+            task_id=task["id"],
+            title=task["title"],
+            objective=mission["description"] or mission["title"],
+            instructions=task["instructions"],
+            outcome=task_status,
+            result=output,
+            observer_summary=observation["summary"],
+            confidence=0.8 if task_status == "completed" else 0.4,
+        )
         updated_tasks = self.missions.list_tasks(mission_id)
         if task_status == "blocked":
             updated_mission = self.missions.set_status(mission_id, "blocked")
@@ -307,6 +322,7 @@ class MissionEngine:
             "provider": reply.provider,
             "model": reply.model,
             "specialist": specialist["id"] if specialist else None,
+            "experience_id": experience["id"],
         }
 
 
