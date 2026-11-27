@@ -96,6 +96,8 @@ def box(lines: Iterable[str], title: str = "", width: int | None = None,
     return "\n".join(out)
 
 
+BACKSLASH = "\\"  # kept out of f-string expressions (invalid before Python 3.12)
+
 AVATAR_ART = (
     " ╭─────╮ ",
     " │ {e} {e} │ ",
@@ -153,7 +155,7 @@ def welcome_panel(version: str, session_title: str, model: str, workspace: str,
         "",
         d("Tips"),
         f"  {c('/help')} commands   {c('/new')} conversation   {c('/models')} runtimes",
-        f"  {c('Tab')} complete   {c('↑/↓')} history   {c('\\')} new line   {c('Ctrl+C')} stop   {c('Ctrl+D')} quit",
+        f"  {c('Tab')} complete   {c('↑/↓')} history   {c(BACKSLASH)} new line   {c('Ctrl+C')} stop   {c('Ctrl+D')} quit",
     ]
     return box(top + tips, width=width, enabled=enabled)
 
