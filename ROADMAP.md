@@ -56,6 +56,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] User controls to list, deactivate and delete memories (initial)
 - [x] Explicit capture of fully completed missions into episodic memory using persisted observer-checked outcomes (initial)
 - [x] Initial Experience Engine captures each mission task attempt with observer outcome and provenance
+- [x] Studio experience explorer with outcome/status filters, evidence detail and review/archive controls
 - [ ] Experience deduplication, retrieval and reviewed lesson synthesis
 - [x] User-triggered conversation memory proposals with exact user-message evidence and explicit review (initial)
 - [ ] Verified conversation/session summarisation into episodic memory

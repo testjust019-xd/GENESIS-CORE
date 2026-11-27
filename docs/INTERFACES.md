@@ -67,6 +67,8 @@ The graphical interface is launched locally through a command such as `genesis s
 - live activity/tool trace
 - model and provider management
 - memory, research, and skills views
+- an Experience Engine view with mission-attempt filters, evidence details and a captured/reviewed/archived workflow
+- responsive access to Studio's right-side panels on narrow screens
 - permissions and autonomy controls
 - settings, logs, and checkpoints
 
