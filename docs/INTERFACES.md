@@ -53,6 +53,7 @@ The TUI uses a dependency-free presentation layer (standard library only, so it 
 - multi-line input (end a line with `\`), reply footer with duration and an approximate token count
 - `/model` to list and switch the primary model, `/export` to save a conversation as Markdown
 - **native models, no Ollama needed:** `/model install` recommends a GGUF model for the device's RAM, downloads it from Hugging Face (resumable, size-checked, HTTPS to huggingface.co only) into `~/.genesis/models`, and GENESIS starts and stops its own `llama-server` (llama.cpp) on a loopback port. `/model use` starts a downloaded model; with no other model configured it starts automatically on the first message. The engine itself must be installed once (`pkg install llama-cpp` on Termux; or set `GENESIS_LLAMA_SERVER`)
+- **Evolution Lab:** `/eval run` measures the model on a fixed rule-based suite, `/eval skill <id>` compares baseline vs with-skill and stores the evidence (shown when you approve a skill), `/evolve` reports the score timeline, skills and memory. Add suites as JSON in `~/.genesis/evals`. Scores are measured behaviour on that suite, not weight changes
 - grouped, filterable help (`/help <text>`) and `/clear`
 - colour is disabled automatically when output is not a terminal or `NO_COLOR` is set
 

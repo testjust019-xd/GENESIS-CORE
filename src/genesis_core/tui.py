@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from genesis_core.agent import AgentRuntime, ModelError
 from genesis_core import model_hub
+from genesis_core.evaluation import EvaluationEngine, EvaluationError, evals_dir
 from genesis_core.adapters import ModelConfig, create_chat_adapter
 from genesis_core.config import read_settings, set_model, write_settings
 from genesis_core.hardware import inspect_hardware
@@ -81,6 +82,7 @@ def run_tui() -> int:
     research_intelligence = ResearchIntelligence(store)
     learning = LearningEngine(store)
     skills = SkillStore(store.database_path, {item['name'] for item in tool_registry.list()})
+    evaluator = EvaluationEngine(store)
     current = None
     sessions = store.list_sessions(limit=1)
     if sessions:
@@ -92,6 +94,17 @@ def run_tui() -> int:
     ui.setup_readline(history_path)
     model_label = _model_label()
     native = NativeRuntime()
+
+    def ensure_model() -> None:
+        """Start the saved native model on demand when no other model is configured."""
+        nonlocal model_label
+        if agent.adapter is None and not read_settings().get("model") and _saved_native():
+            try:
+                with ui.Spinner("Starting your local model"):
+                    model_label = _activate_native(agent, native, _saved_native())
+                print(ui.ok(f"Running {model_label} (managed by GENESIS)."))
+            except NativeRuntimeError as exc:
+                print(ui.error(str(exc)))
     print()
     print(ui.welcome_panel(
         __version__,
@@ -121,13 +134,7 @@ def run_tui() -> int:
         if not raw.startswith("/"):
             if not current:
                 current = store.create_session()["id"]
-            if agent.adapter is None and not read_settings().get("model") and _saved_native():
-                try:
-                    with ui.Spinner("Starting your local model"):
-                        model_label = _activate_native(agent, native, _saved_native())
-                    print(ui.ok(f"Running {model_label} (managed by GENESIS)."))
-                except NativeRuntimeError as exc:
-                    print(ui.error(str(exc)))
+            ensure_model()
             print()
             stream = ui.MarkdownStream()
             spinner = ui.Spinner("Thinking")
@@ -439,6 +446,14 @@ def run_tui() -> int:
                     item = skills.submit(args[1])
                     print(f"Skill {item['id']} is pending review.")
                 elif len(args) == 3 and args[0] == "review":
+                    if args[2] == "approve":
+                        evidence = evaluator.skill_evidence(args[1])
+                        if evidence is None:
+                            print(ui.warn(f"No benchmark evidence yet. /eval skill {args[1]} measures it first."))
+                        elif evidence["verdict"] in {"regressed", "mixed"}:
+                            print(ui.warn(f"Last benchmark verdict: {evidence['verdict']} ({evidence['delta'] * 100:+.0f} pts). Review /eval before trusting it."))
+                        else:
+                            print(ui.info(f"Last benchmark verdict: {evidence['verdict']} ({evidence['delta'] * 100:+.0f} pts)."))
                     item = skills.review(args[1], args[2])
                     print(f"Skill {item['id']} is now {item['status']}.")
                 elif len(args) == 2 and args[0] == "disable":
@@ -451,6 +466,67 @@ def run_tui() -> int:
                     print("Usage: /skill create <name> | <description> | <instructions> | submit <id> | review <id> approve|reject | disable <id> | versions <id>")
             except (SkillError, KeyError) as exc:
                 print(f"Skill error: {exc}")
+        elif command == "/eval":
+            try:
+                sub = args[0] if args else "list"
+
+                def progress(i: int, n: int, task_id: str, passed: bool) -> None:
+                    mark = ui.paint("✔", "bright_green") if passed else ui.paint("✖", "bright_red")
+                    print("\r" + f"  {mark} {i}/{n} {task_id}" + "\033[K", end="", flush=True)
+
+                if sub == "list":
+                    print(ui.info("Benchmark suites:"))
+                    for name, suite in evaluator.suites.items():
+                        print(f"  {ui.paint(name, 'bold')}  {len(suite['tasks'])} tasks  {ui.paint(suite['description'], 'dim')}")
+                    print(ui.paint(f"  Add your own as JSON in {evals_dir()}", "dim"))
+                    print(ui.paint("  Run: /eval run · Test a skill: /eval skill <id>", "dim"))
+                elif sub == "run":
+                    ensure_model()
+                    evaluator.adapter = agent.adapter
+                    run = evaluator.run_suite(args[1] if len(args) > 1 else "core-basics", progress=progress)
+                    print()
+                    print(ui.render_run(run))
+                elif sub == "skill" and len(args) >= 2:
+                    skill = skills.get(args[1])
+                    if skill is None:
+                        raise EvaluationError(f"Skill {args[1]} not found.")
+                    ensure_model()
+                    evaluator.adapter = agent.adapter
+                    print(ui.info(f"Testing skill '{skill['name']}' (runs the suite twice: baseline, then with the skill)…"))
+                    outcome = evaluator.evaluate_skill(skill, args[2] if len(args) > 2 else "core-basics", progress=progress)
+                    print()
+                    print(ui.render_comparison(outcome["comparison"]))
+                elif sub == "compare" and len(args) == 3:
+                    print(ui.render_comparison(evaluator.compare(args[1], args[2])))
+                elif sub == "show" and len(args) == 2:
+                    print(ui.render_run(evaluator.get_run(args[1])))
+                elif sub == "history":
+                    for run in evaluator.history(limit=15):
+                        print(f"  {ui.paint(run['id'], 'gray')}  {run['created_at'][:16]}  {run['suite']:<12} {run['label']:<22} {run['score'] * 100:>3.0f}%  {run['provider']}/{run['model']}")
+                    if not evaluator.history(limit=1):
+                        print(ui.paint("  No runs yet. Try /eval run.", "dim"))
+                else:
+                    print("Usage: /eval list | run [suite] | skill <id> [suite] | compare <a> <b> | show <run> | history")
+            except (EvaluationError, KeyError) as exc:
+                print(ui.error(f"Evaluation error: {exc}"))
+            except ModelError as exc:
+                print(ui.error(f"Model unavailable: {exc}"))
+            except KeyboardInterrupt:
+                print("\n" + ui.warn("Evaluation cancelled (nothing was recorded for the unfinished run)."))
+        elif command == "/evolve":
+            runs = evaluator.timeline()
+            print(ui.info("Evolution report"))
+            if runs:
+                scores = [r["score"] for r in runs][-20:]
+                first, last = scores[0], scores[-1]
+                print(f"  Baseline score  {ui.paint(ui.sparkline(scores), 'bright_cyan')}  {first * 100:.0f}% → {last * 100:.0f}%  ({len(runs)} run(s), model {runs[-1]['model']})")
+            else:
+                print(ui.paint("  No baseline yet. Run /eval run to measure where you start.", "dim"))
+            active = skills.list("active")
+            print(f"  Skills active   {len(active)}   ·   pending review {len(skills.list('pending'))}")
+            print(f"  Memories        {len(memories.list())}   ·   documents {len(knowledge.list_documents())}")
+            print(ui.paint("  Scores come from fixed rule-based tasks. They show measured behaviour on that suite,", "dim"))
+            print(ui.paint("  not model weights changing or general intelligence.", "dim"))
         elif command == "/research":
             try:
                 if len(args) >= 2 and args[0] == "search":

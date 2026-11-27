@@ -449,6 +449,13 @@ HELP_SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
         ("/learn answer <lesson-id> <text>", "Submit a lesson answer"),
         ("/learn attempts <lesson-id>", "Show practice attempts"),
     ]),
+    ("Evolution Lab", [
+        ("/eval run [suite]", "Measure the model on a fixed benchmark suite"),
+        ("/eval skill <id> [suite]", "Test a skill: baseline vs with the skill"),
+        ("/eval compare <run-a> <run-b>", "Compare two runs"),
+        ("/eval show <run-id> | history", "Inspect runs"),
+        ("/evolve", "Progress report: scores over time, skills, memory"),
+    ]),
     ("Missions", [
         ("/missions", "List missions"),
         ("/mission new <title>", "Create a mission"),
@@ -468,7 +475,7 @@ HELP_SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
 SLASH_COMMANDS: list[str] = sorted({
     "/new", "/sessions", "/open", "/history", "/clear", "/export", "/model", "/models", "/tools", "/tool",
     "/approvals", "/approval", "/memory", "/knowledge", "/research", "/learn",
-    "/missions", "/mission", "/help", "/quit", "/exit",
+    "/missions", "/mission", "/eval", "/evolve", "/help", "/quit", "/exit",
 })
 
 SUBCOMMANDS: dict[str, list[str]] = {
@@ -477,6 +484,7 @@ SUBCOMMANDS: dict[str, list[str]] = {
     "/research": ["search", "sources", "review", "report", "reports"],
     "/learn": ["create", "list", "show", "answer", "attempts"],
     "/model": ["install", "use"],
+    "/eval": ["run", "skill", "compare", "show", "history"],
     "/mission": ["new", "status", "plan", "run", "tasks", "replan", "history"],
     "/approval": [],
 }
@@ -586,6 +594,46 @@ def conversation_to_markdown(title: str, messages: list[dict]) -> str:
 def safe_filename(title: str, default: str = "conversation") -> str:
     slug = re.sub(r"[^\w.-]+", "-", title).strip("-._")[:60]
     return slug or default
+
+
+SPARK = "▁▂▃▄▅▆▇█"
+
+
+def sparkline(values: list[float], lo: float = 0.0, hi: float = 1.0) -> str:
+    """Tiny trend chart for values in [lo, hi]."""
+    if not values:
+        return ""
+    span = (hi - lo) or 1.0
+    return "".join(SPARK[min(len(SPARK) - 1, max(0, int((v - lo) / span * (len(SPARK) - 1) + 0.5)))] for v in values)
+
+
+def render_run(run: dict, enabled: bool | None = None) -> str:
+    """Per-task results of one evaluation run."""
+    lines = [info(f"Run {paint(run['id'], 'bold', enabled=enabled)} · {run['suite']} · {run['label']} · "
+                  f"{run['provider']}/{run['model']}", enabled)]
+    for r in run.get("results", []):
+        mark = ok("", enabled) if r["passed"] else (error("", enabled) if not r.get("error") else warn("", enabled))
+        lines.append(f"  {mark}{r['task_id']}")
+    lines.append(f"  Score {run['score'] * 100:.0f}%  ({run['passed']}/{run['total']} tasks passed, "
+                 f"{run['errors']} error(s), {run['duration']:.0f}s)")
+    return "\n".join(lines)
+
+
+def render_comparison(comp: dict, enabled: bool | None = None) -> str:
+    """Baseline vs candidate summary with an honest caveat."""
+    style = {"improved": "bright_green", "slightly improved": "bright_green", "regressed": "bright_red",
+             "mixed": "bright_yellow"}.get(comp["verdict"], "gray")
+    delta = comp["delta"] * 100
+    lines = [
+        info(f"Baseline {comp['base_score'] * 100:.0f}%  →  candidate {comp['candidate_score'] * 100:.0f}%  "
+             f"({delta:+.0f} pts)  verdict: {paint(comp['verdict'].upper(), 'bold', style, enabled=enabled)}", enabled),
+    ]
+    if comp["improved"]:
+        lines.append(f"  {ok('', enabled)}now pass: {', '.join(comp['improved'])}")
+    if comp["regressed"]:
+        lines.append(f"  {error('', enabled)}now fail: {', '.join(comp['regressed'])}")
+    lines.append(paint(f"  {comp['caveat']}", "dim", enabled=enabled))
+    return "\n".join(lines)
 
 
 def clear_screen(stream: TextIO | None = None) -> None:
