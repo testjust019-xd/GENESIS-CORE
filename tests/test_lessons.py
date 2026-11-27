@@ -66,7 +66,7 @@ def test_lesson_rejects_invalid_transitions(tmp_path):
         applicability="Applicability", limitations="Limitations",
         evidence_ids=[item["id"]],
     )
-    with pytest.raises(LessonError, match="Only draft"):
+    with pytest.raises(LessonError, match="Only pending"):
         lessons.review(lesson["id"], "approve")
     pending = lessons.submit(lesson["id"])
     with pytest.raises(LessonError, match="Only pending"):
