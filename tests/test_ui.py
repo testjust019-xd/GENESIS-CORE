@@ -127,3 +127,16 @@ def test_conversation_markdown_and_filename():
     assert md.startswith("# Chat") and "## You\n\nhi" in md and "## GENESIS\n\nhello" in md and "skip" not in md
     assert ui.safe_filename("Salut / ça va?") == "Salut-ça-va"
     assert ui.safe_filename("///") == "conversation"
+
+
+def test_sparkline_and_renderers():
+    assert ui.sparkline([0, 0.5, 1]) == "▁▅█" and ui.sparkline([]) == ""
+    run = {"id": "r1", "suite": "s", "label": "baseline", "provider": "p", "model": "m", "score": 0.5,
+           "passed": 1, "total": 2, "errors": 0, "duration": 3.0,
+           "results": [{"task_id": "a", "passed": True}, {"task_id": "b", "passed": False, "error": None}]}
+    text = ui.render_run(run, enabled=False)
+    assert "Score 50%" in text and "a" in text and "b" in text
+    comp = {"verdict": "improved", "delta": 0.3, "base_score": 0.5, "candidate_score": 0.8,
+            "improved": ["a"], "regressed": [], "caveat": "noisy"}
+    out = ui.render_comparison(comp, enabled=False)
+    assert "IMPROVED" in out and "+30 pts" in out and "now pass: a" in out and "noisy" in out

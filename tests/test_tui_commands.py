@@ -101,3 +101,38 @@ def test_model_install_reports_missing_engine(monkeypatch, tmp_path):
     with redirect_stdout(buf):
         tui.run_tui()
     assert "engine is missing" in buf.getvalue() and "pkg install llama-cpp" in buf.getvalue()
+
+
+def test_eval_and_evolve_commands(monkeypatch, tmp_path):
+    import json
+    from types import SimpleNamespace
+    from genesis_core import agent as agent_module
+
+    class Fake:
+        config = SimpleNamespace(provider="fake", model="tiny")
+
+        def chat(self, messages):
+            prompt = messages[-1]["content"]
+            return "43" if "17 + 26" in prompt else "wrong"
+
+    settings = tmp_path / "settings.json"
+    monkeypatch.setenv("GENESIS_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("NO_COLOR", "1")
+    monkeypatch.setattr(tui, "read_settings", lambda: json.loads(settings.read_text()) if settings.exists() else {})
+    monkeypatch.setattr(tui, "discover_runtimes", lambda: [])
+    monkeypatch.setattr(agent_module, "create_chat_adapter", lambda: Fake())
+    monkeypatch.setattr("genesis_core.evaluation.create_chat_adapter", lambda: Fake())
+    answers = iter(["/evolve", "/eval", "/eval run", "/eval history", "/eval skill nope", "/evolve", "/quit"])
+    monkeypatch.setattr("builtins.input", lambda _="": next(answers))
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        assert tui.run_tui() == 0
+    out = buf.getvalue()
+    assert "No baseline yet" in out
+    assert "core-basics" in out
+    import re
+    assert re.search(r"Score \d+%\s+\(\d+/10 tasks passed", out)
+    assert "arith-1" in out
+    assert "fake/tiny" in out
+    assert "Skill nope not found" in out
+    assert re.search(r"Baseline score\s+\S+\s+\d+% → \d+%\s+\(1 run\(s\)", out)

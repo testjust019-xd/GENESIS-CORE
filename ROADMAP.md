@@ -109,12 +109,13 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Draft / pending / active / disabled lifecycle with explicit human approval (initial)
 - [x] Immutable version snapshots and safe manifest import/export (initial)
 - [ ] Skill execution harness with isolated, permissioned tool workflows
-- [ ] Automated skill evaluation and regression benchmarks
+- [x] Initial automated skill evaluation: deterministic benchmark suites, baseline vs with-skill comparison and stored evidence (`/eval`)
+- [ ] Regression gates that block activation and larger benchmark suites
 - [ ] Skill marketplace and signing / trust metadata
 
 ## Milestone 6 — Training and evolution
 - [ ] Dataset curation and consent / licensing checks
-- [ ] Baseline benchmark suite
+- [x] Initial baseline benchmark suite and score timeline (`/eval run`, `/evolve`)
 - [ ] Optional LoRA training integrations
 - [ ] Compare base and candidate checkpoints
 - [ ] Regression gates and rollback
