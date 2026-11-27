@@ -418,6 +418,8 @@ HELP_SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
     ("Models & tools", [
         ("/models", "Inspect local model runtimes"),
         ("/model [n | provider name]", "Show or switch the primary model"),
+        ("/model install [n | hf:repo/file]", "Download a model directly (no Ollama)"),
+        ("/model use [n | file]", "Start a downloaded model"),
         ("/tools", "List available agent tools"),
         ("/tool <name> [json]", "Run one tool directly"),
         ("/approvals", "List pending tool approvals"),
@@ -474,6 +476,7 @@ SUBCOMMANDS: dict[str, list[str]] = {
     "/knowledge": ["add", "search", "list", "delete"],
     "/research": ["search", "sources", "review", "report", "reports"],
     "/learn": ["create", "list", "show", "answer", "attempts"],
+    "/model": ["install", "use"],
     "/mission": ["new", "status", "plan", "run", "tasks", "replan", "history"],
     "/approval": [],
 }

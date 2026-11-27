@@ -52,6 +52,7 @@ The TUI uses a dependency-free presentation layer (standard library only, so it 
 - live tool trace while the agent works and inline `[y/N]` approval of gated tools (`on_activity` / `on_approval` callbacks on `AgentRuntime.chat`; clients without them keep the approval queue)
 - multi-line input (end a line with `\`), reply footer with duration and an approximate token count
 - `/model` to list and switch the primary model, `/export` to save a conversation as Markdown
+- **native models, no Ollama needed:** `/model install` recommends a GGUF model for the device's RAM, downloads it from Hugging Face (resumable, size-checked, HTTPS to huggingface.co only) into `~/.genesis/models`, and GENESIS starts and stops its own `llama-server` (llama.cpp) on a loopback port. `/model use` starts a downloaded model; with no other model configured it starts automatically on the first message. The engine itself must be installed once (`pkg install llama-cpp` on Termux; or set `GENESIS_LLAMA_SERVER`)
 - grouped, filterable help (`/help <text>`) and `/clear`
 - colour is disabled automatically when output is not a terminal or `NO_COLOR` is set
 

@@ -8,7 +8,11 @@ import shlex
 import time
 from pathlib import Path
 from genesis_core.agent import AgentRuntime, ModelError
-from genesis_core.config import read_settings, set_model
+from genesis_core import model_hub
+from genesis_core.adapters import ModelConfig, create_chat_adapter
+from genesis_core.config import read_settings, set_model, write_settings
+from genesis_core.hardware import inspect_hardware
+from genesis_core.native_runtime import NativeRuntime, NativeRuntimeError, INSTALL_HELP, find_engine
 from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
 from genesis_core.mission_engine import MissionEngine, MissionEngineError
@@ -30,7 +34,34 @@ def _model_label() -> str:
     saved = read_settings().get("model") or {}
     provider = os.environ.get("GENESIS_MODEL_PROVIDER") or saved.get("provider")
     name = os.environ.get("GENESIS_MODEL") or saved.get("name")
+    native = read_settings().get("native") or {}
+    if not (provider or name) and native.get("file"):
+        return f"native/{native['file']}"
     return "/".join(filter(None, [provider, name])) or "auto-detect"
+
+
+def _installed_native() -> list[Path]:
+    return model_hub.installed_models()
+
+
+def _saved_native() -> Path | None:
+    name = (read_settings().get("native") or {}).get("file")
+    path = model_hub.models_dir() / name if name else None
+    return path if path and path.is_file() else None
+
+
+def _activate_native(agent, native: NativeRuntime, path: Path) -> str:
+    """Start the managed engine for ``path`` and point the agent at it."""
+    url = native.start(path)
+    agent.adapter = create_chat_adapter(ModelConfig("llama_cpp", url, path.name))
+    return f"native/{path.name}"
+
+
+def _remember_native(path: Path) -> None:
+    settings = read_settings()
+    settings.pop("model", None)  # native choice replaces any explicit runtime choice
+    settings["native"] = {"file": path.name}
+    write_settings(settings)
 
 
 def run_tui() -> int:
@@ -60,6 +91,7 @@ def run_tui() -> int:
     history_path = genesis_home / "tui_history"
     ui.setup_readline(history_path)
     model_label = _model_label()
+    native = NativeRuntime()
     print()
     print(ui.welcome_panel(
         __version__,
@@ -89,6 +121,13 @@ def run_tui() -> int:
         if not raw.startswith("/"):
             if not current:
                 current = store.create_session()["id"]
+            if agent.adapter is None and not read_settings().get("model") and _saved_native():
+                try:
+                    with ui.Spinner("Starting your local model"):
+                        model_label = _activate_native(agent, native, _saved_native())
+                    print(ui.ok(f"Running {model_label} (managed by GENESIS)."))
+                except NativeRuntimeError as exc:
+                    print(ui.error(str(exc)))
             print()
             stream = ui.MarkdownStream()
             spinner = ui.Spinner("Thinking")
@@ -146,7 +185,7 @@ def run_tui() -> int:
             except ModelError as exc:
                 spinner.stop()
                 print(ui.mini_face("error") + " " + ui.error(f"Model unavailable: {exc}"))
-                print(ui.paint("  Start a local model runtime or set GENESIS_MODEL_PROVIDER / GENESIS_MODEL. Try /models.", "dim"))
+                print(ui.paint("  No model yet? Run /model install to download one directly, or start Ollama / LM Studio.", "dim"))
                 print()
             continue
 
@@ -179,6 +218,66 @@ def run_tui() -> int:
                     print(ui.ok(f"Conversation exported to {target}"))
                 except OSError as exc:
                     print(ui.error(f"Export failed: {exc}"))
+        elif command == "/model" and args and args[0] == "install":
+            try:
+                hw = inspect_hardware()
+                suggested = model_hub.recommend(hw.get("memory_total_bytes"))
+                if len(args) >= 2:
+                    chosen = model_hub.resolve_spec(" ".join(args[1:]))
+                else:
+                    print(ui.info("Models you can download (GGUF, run by GENESIS itself):"))
+                    for number, item in enumerate(model_hub.CATALOG, 1):
+                        star = ui.paint("  ★ recommended for this device", "bright_green") if item.key == suggested.key else ""
+                        print(f"  {ui.paint(str(number), 'bright_yellow')}  {item.title:<24} {item.size_gb:>4.1f} GB  {ui.paint(item.note, 'dim')}{star}")
+                    print(ui.paint("  Custom: /model install hf:owner/repo/file.gguf", "dim"))
+                    choice = input(ui.paint("  Number to install (Enter = recommended, q = cancel) › ", "bright_yellow")).strip().lower()
+                    if choice in {"q", "n", "no"}:
+                        print(ui.paint("  Cancelled.", "dim"))
+                        continue
+                    chosen = model_hub.resolve_spec(choice) if choice else suggested
+                print(ui.info(f"Downloading {chosen.title} from Hugging Face…"))
+                started = time.monotonic()
+
+                def show(done: int, total: int) -> None:
+                    print("\r" + ui.paint("  " + model_hub.progress_bar(done, total, started), "bright_cyan") + "\033[K", end="", flush=True)
+
+                path = model_hub.download(chosen, progress=show)
+                print()
+                print(ui.ok(f"Installed {path.name} ({model_hub.format_size(path.stat().st_size)})."))
+                if find_engine():
+                    with ui.Spinner("Starting your local model"):
+                        model_label = _activate_native(agent, native, path)
+                    _remember_native(path)
+                    print(ui.ok(f"Ready: {model_label}. You can chat now."))
+                else:
+                    _remember_native(path)
+                    print(ui.warn("Model downloaded, but the llama.cpp engine is missing."))
+                    print(ui.paint(INSTALL_HELP, "dim"))
+                    print(ui.paint("  Then run /model use to start it.", "dim"))
+            except (model_hub.HubError, NativeRuntimeError) as exc:
+                print()
+                print(ui.error(str(exc)))
+            except (EOFError, KeyboardInterrupt):
+                print("\n" + ui.paint("  Cancelled. Re-run the command to resume a partial download.", "dim"))
+        elif command == "/model" and args and args[0] == "use":
+            files = _installed_native()
+            try:
+                if len(args) >= 2 and args[1].isdigit() and 1 <= int(args[1]) <= len(files):
+                    path = files[int(args[1]) - 1]
+                elif len(args) >= 2:
+                    path = next((f for f in files if f.name == args[1] or f.stem == args[1]), None)
+                    if path is None:
+                        raise ValueError(f"No installed model named {args[1]}. See /model.")
+                elif files:
+                    path = _saved_native() or files[0]
+                else:
+                    raise ValueError("No downloaded model yet. Run /model install.")
+                with ui.Spinner("Starting your local model"):
+                    model_label = _activate_native(agent, native, path)
+                _remember_native(path)
+                print(ui.ok(f"Running {model_label} (managed by GENESIS)."))
+            except (ValueError, NativeRuntimeError) as exc:
+                print(ui.error(str(exc)))
         elif command == "/model":
             runtimes = discover_runtimes()
             choices = [(r.provider, m) for r in runtimes if r.available for m in r.models]
@@ -192,6 +291,14 @@ def run_tui() -> int:
                     print(f"  {ui.paint(str(number).rjust(2), 'bright_yellow')}  {provider}/{name}")
                 if choices:
                     print(ui.paint("  Switch with /model <number> or /model <provider> <name>", "dim"))
+                files = _installed_native()
+                if files:
+                    print(ui.paint("  Downloaded (run by GENESIS):", "bold"))
+                    for number, f in enumerate(files, 1):
+                        print(f"  {ui.paint(str(number).rjust(2), 'bright_yellow')}  {f.name}  {ui.paint(model_hub.format_size(f.stat().st_size), 'dim')}")
+                    print(ui.paint("  Start one with /model use <number>", "dim"))
+                else:
+                    print(ui.paint("  No model installed? /model install downloads one directly.", "dim"))
             else:
                 try:
                     if len(args) == 1 and args[0].isdigit() and 1 <= int(args[0]) <= len(choices):
