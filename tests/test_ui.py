@@ -105,3 +105,25 @@ def test_spinner_can_restart():
     sp.stop()
     sp.start()
     sp.stop()
+
+
+def test_read_multiline_joins_backslash_continuations():
+    answers = iter(["line one \\", "line two \\", "line three"])
+    assert ui.read_multiline("> ", input_fn=lambda _: next(answers)) == "line one\nline two\nline three"
+    assert ui.read_multiline("> ", input_fn=lambda _: "single") == "single"
+
+
+def test_reply_footer_and_token_estimate():
+    assert ui.estimate_tokens("") == 0 and ui.estimate_tokens("abcdefgh") == 2
+    footer = ui.reply_footer("ollama", "q", 2.345, "x" * 40, enabled=False)
+    assert "ollama/q" in footer and "2.3s" in footer and "~10 tokens" in footer
+
+
+def test_conversation_markdown_and_filename():
+    md = ui.conversation_to_markdown("Chat", [
+        {"role": "user", "content": "hi"}, {"role": "system", "content": "skip"},
+        {"role": "assistant", "content": "hello"},
+    ])
+    assert md.startswith("# Chat") and "## You\n\nhi" in md and "## GENESIS\n\nhello" in md and "skip" not in md
+    assert ui.safe_filename("Salut / ça va?") == "Salut-ça-va"
+    assert ui.safe_filename("///") == "conversation"
