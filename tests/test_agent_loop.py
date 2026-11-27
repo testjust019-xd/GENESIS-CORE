@@ -163,3 +163,52 @@ def test_agent_resumes_exact_approved_tool_request_once(tmp_path):
     assert approvals.get(approval_id)["status"] == "used"
     assert second.assistant_message["content"] == "The note was saved."
     assert second.activity[0]["status"] == "completed"
+
+
+def _gated_runtime(tmp_path, calls):
+    store = StateStore(tmp_path / "genesis.db")
+    session = store.create_session()
+    registry = ToolRegistry()
+    registry.register(ToolSpec(
+        "write_note", "Write a note",
+        {"type": "object", "properties": {}, "additionalProperties": False},
+        lambda _: calls.append("executed") or {"written": True},
+        capabilities=frozenset({"workspace_write"}), risk="write",
+    ))
+    executor = ToolExecutor(
+        registry, PermissionManager({"approval_capabilities": ["workspace_write"]}),
+        ApprovalStore(store.database_path),
+    )
+    adapter = ScriptedAdapter([
+        json.dumps({"action": "tool", "tool": "write_note", "arguments": {}}),
+        json.dumps({"action": "final", "message": "Note written."}),
+    ])
+    return AgentRuntime(store=store, adapter=adapter, tool_executor=executor), session["id"]
+
+
+def test_inline_approval_runs_tool_and_reports_live_activity(tmp_path):
+    calls, events, requests = [], [], []
+    runtime, sid = _gated_runtime(tmp_path, calls)
+
+    def approve(request):
+        requests.append(request)
+        return True
+
+    reply = runtime.chat(sid, "write", on_activity=events.append, on_approval=approve)
+
+    assert calls == ["executed"]
+    assert reply.assistant_message["content"] == "Note written."
+    assert requests[0]["tool"] == "write_note" and requests[0]["id"]
+    assert [e["type"] for e in events] == ["tool_start", "tool"]
+    assert events[1]["status"] == "completed"
+
+
+def test_inline_approval_decline_does_not_run_tool(tmp_path):
+    calls, events = [], []
+    runtime, sid = _gated_runtime(tmp_path, calls)
+
+    reply = runtime.chat(sid, "write", on_activity=events.append, on_approval=lambda r: False)
+
+    assert calls == []
+    assert "declined" in reply.assistant_message["content"]
+    assert events[-1]["status"] == "denied"

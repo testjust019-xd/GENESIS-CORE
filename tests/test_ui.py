@@ -69,3 +69,39 @@ def test_spinner_silent_when_not_tty():
     with ui.Spinner("x", stream=buf):
         pass
     assert buf.getvalue() == ""
+
+
+def test_avatar_states_and_widths():
+    for state in ("idle", "thinking", "happy", "alert", "error"):
+        lines = ui.avatar_lines(state, enabled=False)
+        assert len(lines) == 4 and {len(l) for l in lines} == {9}
+    assert "◉" in "".join(ui.avatar_lines("idle", enabled=False))
+    assert ui.mini_face("happy", enabled=False) == "(◕‿◕)"
+
+
+def test_welcome_panel_shows_avatar_only_when_wide():
+    wide = ui.welcome_panel("1", "S", "m", "/w", enabled=False, width=80)
+    narrow = ui.welcome_panel("1", "S", "m", "/w", enabled=False, width=50)
+    assert "╰─┬─┬─╯" in wide and "╰─┬─┬─╯" not in narrow
+    assert {len(l) for l in wide.splitlines()} == {80}
+
+
+def test_ask_approval_yes_no_and_eof():
+    req = {"id": "a1", "tool": "write_note", "arguments": {"text": "x"}, "reason": "needs write"}
+    out = io.StringIO()
+    assert ui.ask_approval(req, input_fn=lambda _: "y", out=out, enabled=False) is True
+    assert "Approval needed" in out.getvalue() and "write_note" in out.getvalue()
+    assert ui.ask_approval(req, input_fn=lambda _: "", out=io.StringIO(), enabled=False) is False
+
+    def eof(_):
+        raise EOFError
+
+    assert ui.ask_approval(req, input_fn=eof, out=io.StringIO(), enabled=False) is False
+
+
+def test_spinner_can_restart():
+    sp = ui.Spinner("x", stream=io.StringIO())
+    sp.start()
+    sp.stop()
+    sp.start()
+    sp.stop()
