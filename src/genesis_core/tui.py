@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import time
 from pathlib import Path
 from genesis_core.agent import AgentRuntime, ModelError
+from genesis_core.config import read_settings, set_model
 from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
 from genesis_core.mission_engine import MissionEngine, MissionEngineError
@@ -21,6 +23,14 @@ from genesis_core.skills import SkillError, SkillStore
 from genesis_core import __version__, ui
 from genesis_core.state import StateStore
 from genesis_core.tools import ApprovalStore, PermissionManager, ToolExecutor, build_core_registry
+
+
+def _model_label() -> str:
+    """Selected primary model (env overrides settings), or 'auto-detect'."""
+    saved = read_settings().get("model") or {}
+    provider = os.environ.get("GENESIS_MODEL_PROVIDER") or saved.get("provider")
+    name = os.environ.get("GENESIS_MODEL") or saved.get("name")
+    return "/".join(filter(None, [provider, name])) or "auto-detect"
 
 
 def run_tui() -> int:
@@ -49,9 +59,7 @@ def run_tui() -> int:
 
     history_path = genesis_home / "tui_history"
     ui.setup_readline(history_path)
-    model_label = "/".join(
-        filter(None, [os.environ.get("GENESIS_MODEL_PROVIDER"), os.environ.get("GENESIS_MODEL")])
-    ) or "auto-detect"
+    model_label = _model_label()
     print()
     print(ui.welcome_panel(
         __version__,
@@ -68,7 +76,7 @@ def run_tui() -> int:
             pending = len(approvals.list())
             if pending:
                 print(ui.status_line(model_label, len(tool_registry.list()), pending))
-            raw = input(ui.prompt_string(label)).strip()
+            raw = ui.read_multiline(ui.prompt_string(label))
         except EOFError:
             print("\n" + ui.info("Leaving GENESIS TUI."))
             ui.save_history(history_path)
@@ -84,6 +92,7 @@ def run_tui() -> int:
             print()
             stream = ui.MarkdownStream()
             spinner = ui.Spinner("Thinking")
+            started = time.monotonic()
             first_token = True
 
             def reply_header() -> None:
@@ -126,7 +135,8 @@ def run_tui() -> int:
                     reply_header()
                     stream.feed(reply.assistant_message["content"] + "\n")
                     stream.finish()
-                print(ui.paint(f"  {reply.provider}/{reply.model}", "gray"))
+                print(ui.reply_footer(reply.provider, reply.model, time.monotonic() - started,
+                                      reply.assistant_message["content"]))
                 print()
             except KeyboardInterrupt:
                 spinner.stop()
@@ -155,6 +165,49 @@ def run_tui() -> int:
             print(ui.render_help(" ".join(args)))
         elif command == "/clear":
             ui.clear_screen()
+        elif command == "/export":
+            messages = store.list_messages(current) if current else []
+            if not messages:
+                print(ui.warn("Nothing to export yet."))
+            else:
+                title = (store.get_session(current) or {}).get("title", "conversation")
+                target = Path(args[0]).expanduser() if args else (
+                    genesis_home / "exports" / f"{ui.safe_filename(title)}.md")
+                try:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(ui.conversation_to_markdown(title, messages), encoding="utf-8")
+                    print(ui.ok(f"Conversation exported to {target}"))
+                except OSError as exc:
+                    print(ui.error(f"Export failed: {exc}"))
+        elif command == "/model":
+            runtimes = discover_runtimes()
+            choices = [(r.provider, m) for r in runtimes if r.available for m in r.models]
+            if not args:
+                print(ui.info(f"Primary model: {ui.paint(_model_label(), 'bold')}"))
+                if os.environ.get("GENESIS_MODEL") or os.environ.get("GENESIS_MODEL_PROVIDER"):
+                    print(ui.paint("  (set by GENESIS_MODEL* environment variables, which override saved settings)", "dim"))
+                if not choices:
+                    print(ui.paint("  No local model found. Start Ollama, LM Studio or llama.cpp.", "dim"))
+                for number, (provider, name) in enumerate(choices, 1):
+                    print(f"  {ui.paint(str(number).rjust(2), 'bright_yellow')}  {provider}/{name}")
+                if choices:
+                    print(ui.paint("  Switch with /model <number> or /model <provider> <name>", "dim"))
+            else:
+                try:
+                    if len(args) == 1 and args[0].isdigit() and 1 <= int(args[0]) <= len(choices):
+                        provider, name = choices[int(args[0]) - 1]
+                    elif len(args) >= 2:
+                        provider, name = args[0], " ".join(args[1:])
+                    else:
+                        raise ValueError("Use /model <number> from the list, or /model <provider> <name>.")
+                    set_model(provider, name)
+                    agent.adapter = None  # rebuilt from settings on the next message
+                    model_label = _model_label()
+                    print(ui.ok(f"Primary model set to {provider}/{name}."))
+                    if os.environ.get("GENESIS_MODEL") or os.environ.get("GENESIS_MODEL_PROVIDER"):
+                        print(ui.warn("GENESIS_MODEL* environment variables still override this choice."))
+                except ValueError as exc:
+                    print(ui.error(str(exc)))
         elif command == "/new":
             item = store.create_session(" ".join(args) or "New conversation")
             current = item["id"]

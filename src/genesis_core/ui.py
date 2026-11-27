@@ -153,7 +153,7 @@ def welcome_panel(version: str, session_title: str, model: str, workspace: str,
         "",
         d("Tips"),
         f"  {c('/help')} commands   {c('/new')} conversation   {c('/models')} runtimes",
-        f"  {c('Tab')} complete   {c('↑/↓')} history   {c('Ctrl+C')} stop reply   {c('Ctrl+D')} quit",
+        f"  {c('Tab')} complete   {c('↑/↓')} history   {c('\\')} new line   {c('Ctrl+C')} stop   {c('Ctrl+D')} quit",
     ]
     return box(top + tips, width=width, enabled=enabled)
 
@@ -176,9 +176,10 @@ def approval_card(request: dict, enabled: bool | None = None, width: int | None 
     return box(lines, title="Approval needed", width=width, style="bright_yellow", enabled=enabled)
 
 
-def ask_approval(request: dict, input_fn=input, out: TextIO | None = None,
+def ask_approval(request: dict, input_fn=None, out: TextIO | None = None,
                  enabled: bool | None = None) -> bool:
     """Show an approval card and ask ``[y/N]``. Anything but yes (or EOF) declines."""
+    input_fn = input_fn or input
     out = out or sys.stdout
     out.write("\n" + approval_card(request, enabled=enabled) + "\n")
     out.flush()
@@ -410,9 +411,11 @@ HELP_SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
         ("/open <id>", "Switch conversation"),
         ("/history", "Show current conversation"),
         ("/clear", "Clear the screen"),
+        ("/export [path]", "Save this conversation as Markdown"),
     ]),
     ("Models & tools", [
         ("/models", "Inspect local model runtimes"),
+        ("/model [n | provider name]", "Show or switch the primary model"),
         ("/tools", "List available agent tools"),
         ("/tool <name> [json]", "Run one tool directly"),
         ("/approvals", "List pending tool approvals"),
@@ -459,7 +462,7 @@ HELP_SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
 ]
 
 SLASH_COMMANDS: list[str] = sorted({
-    "/new", "/sessions", "/open", "/history", "/clear", "/models", "/tools", "/tool",
+    "/new", "/sessions", "/open", "/history", "/clear", "/export", "/model", "/models", "/tools", "/tool",
     "/approvals", "/approval", "/memory", "/knowledge", "/research", "/learn",
     "/missions", "/mission", "/help", "/quit", "/exit",
 })
@@ -537,6 +540,47 @@ def save_history(history_path: Path | None) -> None:
         readline.write_history_file(str(history_path))
     except Exception:  # pragma: no cover
         pass
+
+
+def read_multiline(prompt: str, input_fn=None, continuation: str = "… ") -> str:
+    """Read one logical input; a trailing backslash continues on the next line."""
+    input_fn = input_fn or input  # resolved at call time so it can be patched
+    lines: list[str] = []
+    text = input_fn(prompt)
+    while text.rstrip().endswith("\\"):
+        lines.append(text.rstrip()[:-1].rstrip())
+        text = input_fn(paint(continuation, "gray") if continuation else "")
+    lines.append(text)
+    return "\n".join(lines).strip()
+
+
+def estimate_tokens(text: str) -> int:
+    """Rough token estimate (~4 characters per token); always labelled approximate."""
+    return max(1, round(len(text) / 4)) if text else 0
+
+
+def reply_footer(provider: str, model: str, seconds: float, reply_text: str,
+                 enabled: bool | None = None) -> str:
+    """Footer under a reply: model, duration and an approximate token count."""
+    tokens = estimate_tokens(reply_text)
+    return paint(f"  {provider}/{model} · {seconds:.1f}s · ~{tokens} tokens", "gray", enabled=enabled)
+
+
+def conversation_to_markdown(title: str, messages: list[dict]) -> str:
+    """Render a conversation as a Markdown transcript."""
+    out = [f"# {title}", ""]
+    for message in messages:
+        role = str(message.get("role", "")).lower()
+        if role not in {"user", "assistant"}:
+            continue
+        who = "You" if role == "user" else "GENESIS"
+        out += [f"## {who}", "", str(message.get("content", "")).strip(), ""]
+    return "\n".join(out).rstrip() + "\n"
+
+
+def safe_filename(title: str, default: str = "conversation") -> str:
+    slug = re.sub(r"[^\w.-]+", "-", title).strip("-._")[:60]
+    return slug or default
 
 
 def clear_screen(stream: TextIO | None = None) -> None:
