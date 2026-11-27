@@ -55,6 +55,8 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Searchable active memory retrieval injected into agent context (initial)
 - [x] User controls to list, deactivate and delete memories (initial)
 - [x] Explicit capture of fully completed missions into episodic memory using persisted observer-checked outcomes (initial)
+- [x] Initial Experience Engine captures each mission task attempt with observer outcome and provenance
+- [ ] Experience deduplication, retrieval and reviewed lesson synthesis
 - [x] User-triggered conversation memory proposals with exact user-message evidence and explicit review (initial)
 - [ ] Verified conversation/session summarisation into episodic memory
 - [x] Initial user-directed learning curricula and persistent practice attempts
