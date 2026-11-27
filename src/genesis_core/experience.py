@@ -96,7 +96,11 @@ class ExperienceStore:
             raise ExperienceError("Experience fields must be non-empty text.")
         if not isinstance(outcome, str) or outcome not in EXPERIENCE_OUTCOMES:
             raise ExperienceError(f"Unsupported experience outcome: {outcome}")
-        if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
+        if (
+            isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float))
+            or not 0 <= confidence <= 1
+        ):
             raise ExperienceError("Confidence must be a number between 0 and 1.")
 
         item = {
