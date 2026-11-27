@@ -18,17 +18,9 @@ from genesis_core.research import ResearchEngine, ResearchError
 from genesis_core.research_intelligence import ResearchIntelligence, ResearchIntelligenceError
 from genesis_core.learning import LearningEngine, LearningError
 from genesis_core.skills import SkillError, SkillStore
+from genesis_core import __version__, ui
 from genesis_core.state import StateStore
 from genesis_core.tools import ApprovalStore, PermissionManager, ToolExecutor, build_core_registry
-
-
-BANNER = r"""
-   ____ _____ _   _ _____ ____ ___ ____  
-  / ___| ____| \ | | ____/ ___|_ _/ ___| 
- | |  _|  _| |  \| |  _| \___ \| | |     
- | |_| | |___| |\  | |___ ___) | | |___  
-  \____|_____|_| \_|_____|____/___\____| 
-"""
 
 
 def run_tui() -> int:
@@ -55,38 +47,80 @@ def run_tui() -> int:
     else:
         current = store.create_session()["id"]
 
-    print(BANNER)
-    print("GENESIS CORE · TERMINAL WORKSPACE")
-    print("Shared local sessions · type /help for commands · /quit to exit")
-    print("GENESIS agent runtime enabled · connect a supported model runtime to chat.")
+    history_path = genesis_home / "tui_history"
+    ui.setup_readline(history_path)
+    model_label = "/".join(
+        filter(None, [os.environ.get("GENESIS_MODEL_PROVIDER"), os.environ.get("GENESIS_MODEL")])
+    ) or "auto-detect"
+    print()
+    print(ui.welcome_panel(
+        __version__,
+        (store.get_session(current) or {}).get("title", "New conversation"),
+        model_label,
+        str(genesis_home / "workspace"),
+    ))
     print()
 
     while True:
         session = store.get_session(current) if current else None
         label = session["title"] if session else "No session"
         try:
-            raw = input(f"\033[96mGENESIS\033[0m [{label[:28]}] > ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nLeaving GENESIS TUI.")
+            pending = len(approvals.list())
+            if pending:
+                print(ui.status_line(model_label, len(tool_registry.list()), pending))
+            raw = input(ui.prompt_string(label)).strip()
+        except EOFError:
+            print("\n" + ui.info("Leaving GENESIS TUI."))
+            ui.save_history(history_path)
             return 0
+        except KeyboardInterrupt:
+            print("\n" + ui.paint("Press Ctrl+D or type /quit to exit.", "dim"))
+            continue
         if not raw:
             continue
         if not raw.startswith("/"):
             if not current:
                 current = store.create_session()["id"]
+            print()
+            stream = ui.MarkdownStream()
+            spinner = ui.Spinner("Thinking")
+            first_token = True
+
+            def on_token(chunk: str) -> None:
+                nonlocal first_token
+                if first_token:
+                    spinner.stop()
+                    print(ui.paint("genesis", "bold", "bright_cyan"))
+                    first_token = False
+                stream.feed(chunk)
+
             try:
-                reply = agent.chat(current, raw)
-                print(f"\nGENESIS [{reply.provider}/{reply.model}]")
-                for event in reply.activity:
-                    if event["type"] == "tool":
-                        print(f"  [EXECUTOR] {event['tool']} -> {event['status']}")
-                    elif event["type"] in {"tool_error", "error", "limit", "loop_guard"}:
-                        print(f"  [OBSERVER] {event.get('detail', event['type'])}")
-                print(reply.assistant_message["content"])
+                with spinner:
+                    reply = agent.chat(current, raw, on_token=on_token)
+                spinner.stop()
+                stream.finish()
+                if first_token and reply.assistant_message["content"]:
+                    # Adapter produced no streamed tokens: render the final message.
+                    print(ui.paint("genesis", "bold", "bright_cyan"))
+                    stream.feed(reply.assistant_message["content"] + "\n")
+                    stream.finish()
+                trace = [line for line in (ui.format_activity(e) for e in reply.activity) if line]
+                if trace:
+                    print(ui.paint("  tools", "dim"))
+                    for line in trace:
+                        print(line)
+                print(ui.paint(f"  {reply.provider}/{reply.model}", "gray"))
+                print()
+            except KeyboardInterrupt:
+                spinner.stop()
+                stream.finish()
+                print("\n" + ui.warn("Reply cancelled."))
                 print()
             except ModelError as exc:
-                print(f"\nModel unavailable: {exc}")
-                print("Start a local model runtime or configure GENESIS_MODEL_PROVIDER / GENESIS_MODEL.\n")
+                spinner.stop()
+                print(ui.error(f"Model unavailable: {exc}"))
+                print(ui.paint("  Start a local model runtime or set GENESIS_MODEL_PROVIDER / GENESIS_MODEL. Try /models.", "dim"))
+                print()
             continue
 
         try:
@@ -97,65 +131,30 @@ def run_tui() -> int:
         command, args = parts[0].lower(), parts[1:]
 
         if command in {"/quit", "/exit"}:
-            print("Leaving GENESIS TUI.")
+            print(ui.info("Leaving GENESIS TUI."))
+            ui.save_history(history_path)
             return 0
         if command == "/help":
-            print(
-                "\nCommands:\n"
-                "  /new [title]       Create a conversation\n"
-                "  /sessions          List shared conversations\n"
-                "  /open <id>         Switch conversation\n"
-                "  /history           Show current conversation\n"
-                "  /models            Inspect local model runtimes\n"
-                "  /tools             List available agent tools\n"
-                "  /approvals         List pending tool approvals\n"
-                "  /approval <id> approve|reject  Decide a pending approval\n"
-                "  /memory list [type]  List active memories\n"
-                "  /memory search <text> Search active memories\n"
-                "  /memory add <type> <text> Save an explicit memory\n"
-                "  /memory mission <id> Capture a completed mission as an episode\n"
-                "  /memory extract [session-id] Propose conversation memories\n"
-                "  /memory candidates [session-id] List pending proposals\n"
-                "  /memory candidate <id> accept|reject Review a proposal\n"
-                "  /memory off|delete <id> Deactivate or delete a memory\n"
-                "  /knowledge add <path> Import UTF-8 text or selectable-text PDF\n"
-                "  /knowledge search <query> Search indexed documents\n"
-                "  /knowledge list|delete <id> Manage indexed documents\n"
-                "  /research search <query> Search web or local knowledge\n"
-                "  /research sources [pending|approved|rejected] List saved sources\n"
-                "  /research review <id> approve|reject Review a source\n"
-                "  /research report <run-id> [focus] Generate a cited synthesis from approved sources\n"
-                "  /research reports [run-id] List saved research reports\n"
-                "  /learn create <goal> Create a learning curriculum\n"
-                "  /learn list | show <course-id> | answer <lesson-id> <text> | attempts <lesson-id>\n"
-                "  /missions          List missions\n"
-                "  /mission new <title>  Create a mission\n"
-                "  /mission status <id> <status>  Update mission status\n"
-                "  /mission plan <id>  Generate a task plan\n"
-                "  /mission run <id>   Execute the next task\n"
-                "  /mission tasks <id> Show mission tasks\n"
-                "  /mission replan <id> [reason] Propose a revised plan after a blocker\n"
-                "  /mission history <id> Show saved plan revisions\n"
-                "  /help              Show this help\n"
-                "  /quit              Exit\n"
-            )
+            print(ui.render_help(" ".join(args)))
+        elif command == "/clear":
+            ui.clear_screen()
         elif command == "/new":
             item = store.create_session(" ".join(args) or "New conversation")
             current = item["id"]
-            print(f"Created conversation {current}.")
+            print(ui.ok(f"Created conversation {current}."))
         elif command == "/sessions":
             items = store.list_sessions()
             if not items:
                 print("No conversations yet.")
             for item in items:
-                marker = "*" if item["id"] == current else " "
-                print(f"{marker} {item['id']}  {item['title']}")
+                marker = ui.paint("▶", "bright_cyan") if item["id"] == current else " "
+                print(f"{marker} {ui.paint(item['id'], 'gray')}  {item['title']}")
         elif command == "/open":
             if not args:
                 print("Usage: /open <session-id>")
             elif store.get_session(args[0]):
                 current = args[0]
-                print(f"Opened conversation {current}.")
+                print(ui.ok(f"Opened conversation {current}."))
             else:
                 print("Conversation not found.")
         elif command == "/history":
@@ -163,8 +162,8 @@ def run_tui() -> int:
                 print(f"{message['role'].upper()}: {message['content']}")
         elif command == "/models":
             for runtime in discover_runtimes():
-                status = "ONLINE" if runtime.available else "OFFLINE"
-                print(f"{runtime.provider}: {status} — {runtime.detail}")
+                status = ui.paint("● ONLINE", "bright_green") if runtime.available else ui.paint("○ OFFLINE", "gray")
+                print(f"{ui.paint(runtime.provider, 'bold')}: {status} — {runtime.detail}")
                 for model in runtime.models:
                     print(f"  • {model}")
         elif command == "/tool":
@@ -426,7 +425,7 @@ def run_tui() -> int:
             except (MissionError, MissionEngineError, KeyError, ModelError) as exc:
                 print(f"Mission error: {exc}")
         else:
-            print(f"Unknown command: {command}. Type /help.")
+            print(ui.error(f"Unknown command: {command}. Type /help."))
 
     return 0
 

@@ -39,6 +39,18 @@ The terminal interface is launched with `genesis`. It should provide:
 
 The TUI should remain usable over SSH and on modest Linux machines.
 
+### Terminal experience (`genesis_core/ui.py`)
+
+The TUI uses a dependency-free presentation layer (standard library only, so it works on Termux, SSH and minimal containers):
+
+- welcome panel with session, model and workspace
+- streamed replies rendered as lightweight markdown (headings, bullets, `inline code`, fenced code blocks)
+- animated "thinking" indicator; **Ctrl+C** cancels a reply and returns to the prompt, **Ctrl+D** quits
+- tool-activity trace after each reply and a pending-approvals notice above the prompt
+- Tab completion for slash commands and sub-commands, persistent input history (`~/.genesis/tui_history`)
+- grouped, filterable help (`/help <text>`) and `/clear`
+- colour is disabled automatically when output is not a terminal or `NO_COLOR` is set
+
 ## GENESIS Studio
 
 The graphical interface is launched locally through a command such as `genesis studio` and opened in the user's browser. It should provide:
