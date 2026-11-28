@@ -139,6 +139,15 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [ ] Optional multi-model specialist network
 - [ ] Extension catalogue and signing / trust metadata
 
+## Milestone 9 — Artifact Engine
+- [x] Local artifact storage in the shared SQLite database
+- [x] Studio HTML/CSS/JavaScript editor with live sandboxed preview
+- [x] Artifact create, list, open, update and delete API
+- [x] Restrictive preview CSP and iframe isolation without same-origin privileges
+- [ ] Agent-assisted artifact generation with explicit review
+- [ ] Version history, export and reusable artifact templates
+- [ ] Optional controlled preview of local project assets
+
 ## Design constraints
 - Local-first and usable without an API key.
 - Optional capabilities must remain optional.
