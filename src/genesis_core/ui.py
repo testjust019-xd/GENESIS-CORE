@@ -225,6 +225,48 @@ def welcome_panel(version: str, session_title: str, model: str, workspace: str,
     return box(top + tips, width=width, enabled=enabled)
 
 
+def render_diff(old: str, new: str, enabled: bool | None = None, max_lines: int = 40) -> str:
+    """Coloured unified diff (+ green, - red), truncated for readability."""
+    import difflib
+
+    lines = list(difflib.unified_diff(old.splitlines(), new.splitlines(), "before", "after", lineterm="", n=2))
+    if not lines:
+        return paint("(no changes)", "dim", enabled=enabled)
+    shown = lines[:max_lines]
+    out = []
+    for line in shown:
+        if line.startswith("+++") or line.startswith("---"):
+            out.append(paint(line, "dim", enabled=enabled))
+        elif line.startswith("@@"):
+            out.append(paint(line, "bright_cyan", enabled=enabled))
+        elif line.startswith("+"):
+            out.append(paint(line, "bright_green", enabled=enabled))
+        elif line.startswith("-"):
+            out.append(paint(line, "bright_red", enabled=enabled))
+        else:
+            out.append(line)
+    if len(lines) > max_lines:
+        out.append(paint(f"… {len(lines) - max_lines} more line(s)", "dim", enabled=enabled))
+    return "\n".join(out)
+
+
+def build_write_diff(arguments: dict, workspace: Path | str, enabled: bool | None = None) -> str | None:
+    """Diff for a file-writing tool call (path + content/text), confined to ``workspace``."""
+    path_arg = arguments.get("path")
+    new = arguments.get("content", arguments.get("text"))
+    if not isinstance(path_arg, str) or not isinstance(new, str):
+        return None
+    root = Path(workspace).expanduser().resolve()
+    target = (root / path_arg).resolve()
+    if root != target and root not in target.parents:
+        return None  # never read outside the workspace
+    try:
+        old = target.read_text(encoding="utf-8") if target.is_file() else ""
+    except (OSError, UnicodeDecodeError):
+        return None
+    return render_diff(old, new, enabled=enabled)
+
+
 def approval_card(request: dict, enabled: bool | None = None, width: int | None = None) -> str:
     """Boxed description of a gated tool call, shown before asking y/n."""
     import json as _json
@@ -240,22 +282,35 @@ def approval_card(request: dict, enabled: bool | None = None, width: int | None 
     ]
     if request.get("reason"):
         lines.append(f"{paint('Why', 'dim', enabled=enabled)}     {request['reason']}")
+    if request.get("diff"):
+        lines.append("")
+        lines.extend(str(request["diff"]).splitlines())
     return box(lines, title="Approval needed", width=width, style="bright_yellow", enabled=enabled)
 
 
-def ask_approval(request: dict, input_fn=None, out: TextIO | None = None,
-                 enabled: bool | None = None) -> bool:
-    """Show an approval card and ask ``[y/N]``. Anything but yes (or EOF) declines."""
+def ask_approval_choice(request: dict, input_fn=None, out: TextIO | None = None,
+                        enabled: bool | None = None) -> str:
+    """Show an approval card; returns ``"yes"``, ``"always"`` (this tool, this session) or ``"no"``."""
     input_fn = input_fn or input
     out = out or sys.stdout
     out.write("\n" + approval_card(request, enabled=enabled) + "\n")
     out.flush()
     try:
-        answer = input_fn("  " + mini_face("alert", enabled) + paint(" Allow this action? [y/N] ", "bright_yellow", enabled=enabled)).strip().lower()
+        answer = input_fn("  " + mini_face("alert", enabled)
+                          + paint(" Allow? [y]es / [a]lways for this tool this session / [N]o ", "bright_yellow", enabled=enabled))
     except (EOFError, KeyboardInterrupt):
         out.write("\n")
-        return False
-    return answer in {"y", "yes", "o", "oui"}
+        return "no"
+    answer = answer.strip().lower()
+    if answer in {"a", "always", "t", "toujours"}:
+        return "always"
+    return "yes" if answer in {"y", "yes", "o", "oui"} else "no"
+
+
+def ask_approval(request: dict, input_fn=None, out: TextIO | None = None,
+                 enabled: bool | None = None) -> bool:
+    """Boolean form of :func:`ask_approval_choice` (``always`` counts as yes)."""
+    return ask_approval_choice(request, input_fn, out, enabled) in {"yes", "always"}
 
 
 def format_tool_start(event: dict, enabled: bool | None = None) -> str:
@@ -271,7 +326,7 @@ def format_tool_start(event: dict, enabled: bool | None = None) -> str:
 # Prompt
 # --------------------------------------------------------------------------- #
 
-def prompt_string(session_title: str, enabled: bool | None = None) -> str:
+def prompt_string(session_title: str, enabled: bool | None = None, markers: bool = True) -> str:
     """Prompt with zero-width markers so readline measures the width correctly."""
     if enabled is None:
         enabled = color_enabled()
@@ -280,7 +335,7 @@ def prompt_string(session_title: str, enabled: bool | None = None) -> str:
         return f"genesis [{label}] › "
 
     def w(code: str) -> str:  # wrap non-printing sequences for readline
-        return f"\001\033[{code}m\002"
+        return f"\001\033[{code}m\002" if markers else f"\033[{code}m"
 
     return (f"{w('1;96')}genesis{w('0')} {w('90')}[{label}]{w('0')} {w('96')}›{w('0')} ")
 
@@ -350,6 +405,43 @@ def render_inline(text: str, enabled: bool | None = None) -> str:
     return text
 
 
+_PY_KW = ("def class return if elif else for while import from as with try except finally raise "
+          "lambda yield pass break continue in not and or is None True False async await global nonlocal").split()
+_SH_KW = "if then else elif fi for do done while case esac function in export echo cd sudo pip pkg git".split()
+_JS_KW = "const let var function return if else for while import from export class new this null true false async await".split()
+_STRING = r"\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'"
+
+
+def highlight_code(line: str, lang: str = "", enabled: bool | None = None) -> str:
+    """Tiny line-based syntax colouring for common languages (comments, strings, numbers, keywords)."""
+    if enabled is None:
+        enabled = color_enabled()
+    if not enabled or not line.strip():
+        return line
+    lang = lang.lower().strip()
+    if lang in {"py", "python"}:
+        keywords, comment = _PY_KW, r"#.*"
+    elif lang in {"sh", "bash", "shell", "zsh", "console"}:
+        keywords, comment = _SH_KW, r"#.*"
+    elif lang in {"js", "javascript", "ts", "typescript", "json"}:
+        keywords, comment = _JS_KW, r"//.*"
+    else:
+        return paint(line, "bright_green", enabled=True)
+    pattern = re.compile(
+        rf"(?P<comment>{comment})|(?P<string>{_STRING})|(?P<number>\b\d+(?:\.\d+)?\b)"
+        rf"|(?P<kw>\b(?:{'|'.join(keywords)})\b)")
+    out, last = [], 0
+    for match in pattern.finditer(line):
+        out.append(line[last:match.start()])
+        kind = match.lastgroup
+        style = {"comment": "gray", "string": "bright_green", "number": "bright_yellow",
+                 "kw": "bright_magenta"}[kind]
+        out.append(paint(match.group(0), style, enabled=True))
+        last = match.end()
+    out.append(line[last:])
+    return "".join(out)
+
+
 class MarkdownStream:
     """Incremental line-based markdown renderer.
 
@@ -364,6 +456,7 @@ class MarkdownStream:
         self.indent = indent
         self._buffer = ""
         self._in_code = False
+        self._lang = ""
         self.wrote = False
 
     def feed(self, chunk: str) -> None:
@@ -384,6 +477,7 @@ class MarkdownStream:
         if stripped.startswith("```"):
             if not self._in_code:
                 lang = stripped[3:].strip()
+                self._lang = lang
                 self._in_code = True
                 label = paint(f"┌ {lang}" if lang else "┌", "gray", enabled=e)
                 self.out.write(f"{self.indent}{label}\n")
@@ -391,7 +485,7 @@ class MarkdownStream:
                 self._in_code = False
                 self.out.write(f"{self.indent}{paint('└', 'gray', enabled=e)}\n")
         elif self._in_code:
-            self.out.write(f"{self.indent}{paint('│', 'gray', enabled=e)} {paint(line, 'bright_green', enabled=e)}\n")
+            self.out.write(f"{self.indent}{paint('│', 'gray', enabled=e)} {highlight_code(line, self._lang, e)}\n")
         elif stripped.startswith("#"):
             title = stripped.lstrip("#").strip()
             self.out.write(f"{self.indent}{paint(title, 'bold', 'bright_cyan', enabled=e)}\n")
@@ -573,6 +667,44 @@ def render_help(filter_text: str = "", enabled: bool | None = None) -> str:
     if not out:
         return warn(f"No command matches '{filter_text}'.", enabled)
     return "\n".join(out) + "\n"
+
+
+def command_descriptions() -> dict[str, str]:
+    """Slash command -> one-line description (first help entry of each command wins)."""
+    found: dict[str, str] = {}
+    for _section, rows in HELP_SECTIONS:
+        for usage, desc in rows:
+            command = usage.split()[0]
+            if command.startswith("/"):
+                found.setdefault(command, desc)
+    return found
+
+
+def completion_items(buffer: str) -> list[tuple[str, str]]:
+    """Rich completions for a rich prompt: ``(text_to_insert, description)`` for the last word."""
+    parts = buffer.lstrip().split(" ")
+    descriptions = command_descriptions()
+    if len(parts) == 1:
+        word = parts[0]
+        if not word.startswith("/"):
+            return []
+        return [(c, descriptions.get(c, "")) for c in SLASH_COMMANDS if c.startswith(word)]
+    if len(parts) == 2:
+        word = parts[1]
+        return [(sub, "") for sub in SUBCOMMANDS.get(parts[0].lower(), []) if sub.startswith(word)]
+    return []
+
+
+def toolbar_text(model_label: str, session_title: str, tools: int, pending: int,
+                 last_score: float | None = None) -> str:
+    """Plain-text status bar content for the bottom toolbar."""
+    parts = [f" ✦ {model_label}", f"{session_title[:24]}", f"{tools} tools"]
+    if last_score is not None:
+        parts.append(f"bench {last_score * 100:.0f}%")
+    if pending:
+        parts.append(f"⚠ {pending} approval(s) pending")
+    parts.append("Tab · Ctrl+C stop · Ctrl+D quit ")
+    return "  │  ".join(parts)
 
 
 def complete_line(buffer: str, text: str) -> list[str]:
