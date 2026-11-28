@@ -157,6 +157,7 @@ const VIEWS = {
   missions: { title: 'Missions', load: renderMissions },
   memory: { title: 'Memory', load: renderMemory },
   skills: { title: 'Skills', load: renderSkills },
+  artifacts: { title: 'Artifacts', load: renderArtifacts },
   evolution: { title: 'Evolution', load: renderEvolution },
   system: { title: 'System', load: renderSystem },
 };
@@ -703,6 +704,99 @@ async function renderEvolution() {
     }
   }
   try { await loadProposals(); } catch (e) { proposals.append(empty('Could not load proposals', e.message)); }
+}
+
+
+async function renderArtifacts() {
+  const view = $('#view-artifacts');
+  const page = pageShell('Artifact Engine', 'Build and keep small web experiences inside GENESIS. Preview runs in a sandboxed frame; artifacts stay in your local GENESIS database.');
+  view.replaceChildren(page);
+  const layout = h('div', { style: 'display:grid;grid-template-columns:minmax(220px,.72fr) minmax(0,1.5fr);gap:18px;align-items:start' });
+  const library = h('section', { class: 'notice' });
+  const editor = h('section', {});
+  layout.append(library, editor);
+  page.append(layout);
+  const title = h('input', { type: 'text', maxlength: '120', placeholder: 'Artifact title', class: 'artifact-input' });
+  const description = h('input', { type: 'text', maxlength: '500', placeholder: 'Short description', class: 'artifact-input' });
+  const source = h('textarea', { class: 'artifact-source', spellcheck: 'false', 'aria-label': 'HTML source' });
+  source.value = '<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>My artifact</title><style>body{font:16px system-ui;padding:2rem;background:#101827;color:#eef4ff}button{padding:.7rem 1rem;border:0;border-radius:9px;background:#70d9bd;color:#07130f;cursor:pointer}</style></head>\n<body><h1>Hello from GENESIS</h1><p>Edit this HTML and preview it live.</p><button onclick="document.querySelector(\'p\').textContent=\'It works!\'">Try it</button></body>\n</html>';
+  const frame = h('iframe', { class: 'artifact-preview', title: 'Sandboxed artifact preview', sandbox: 'allow-scripts' });
+  const actions = h('div', { class: 'bar' });
+  const save = h('button', { class: 'btn primary', type: 'button', text: 'Save artifact' });
+  const fresh = h('button', { class: 'btn', type: 'button', text: 'New' });
+  const refresh = h('button', { class: 'btn', type: 'button', text: 'Refresh preview' });
+  const status = h('span', { class: 'sub', text: 'Unsaved artifact' });
+  actions.append(save, fresh, refresh, status);
+  editor.append(h('div', { class: 'form' }, h('label', {}, 'Title', title), h('label', {}, 'Description', description)),
+    h('div', { class: 'bar' }, h('strong', { text: 'HTML editor' }), refresh),
+    source, actions, h('h3', { style: 'margin-top:24px', text: 'Live preview' }), frame);
+  let selectedId = null;
+  let items = [];
+  const preview = () => {
+    const policy = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'\">";
+    frame.srcdoc = '<!doctype html>' + policy + source.value;
+  };
+  const reset = () => {
+    selectedId = null;
+    title.value = '';
+    description.value = '';
+    status.textContent = 'Unsaved artifact';
+    save.textContent = 'Save artifact';
+    preview();
+    renderList();
+  };
+  const select = async id => {
+    try {
+      const data = await api('/api/artifacts/' + encodeURIComponent(id));
+      selectedId = id;
+      title.value = data.artifact.title;
+      description.value = data.artifact.description || '';
+      source.value = data.artifact.html;
+      status.textContent = 'Saved · ' + ago(data.artifact.updated_at);
+      save.textContent = 'Update artifact';
+      preview();
+      renderList();
+    } catch (e) { toast(e.message, 'bad'); }
+  };
+  const renderList = () => {
+    library.replaceChildren(h('div', { class: 'bar' }, h('strong', { text: 'Your artifacts' }), h('span', { class: 'pill', text: String(items.length) })));
+    if (!items.length) library.append(empty('No artifacts yet', 'Create an HTML experience and save it here.'));
+    for (const item of items) {
+      const open = h('button', { class: 'artifact-item' + (item.id === selectedId ? ' selected' : ''), type: 'button', onclick: () => select(item.id) },
+        h('strong', { text: item.title }), h('span', { text: item.description || 'HTML artifact' }), h('small', { text: ago(item.updated_at) }));
+      library.append(open);
+    }
+  };
+  const loadList = async () => {
+    const data = await api('/api/artifacts');
+    items = data.artifacts;
+    renderList();
+  };
+  save.addEventListener('click', () => guard(save, async () => {
+    const payload = { title: title.value, description: description.value, html: source.value };
+    const data = await api(selectedId ? '/api/artifacts/' + encodeURIComponent(selectedId) : '/api/artifacts', {
+      method: selectedId ? 'PUT' : 'POST', body: payload,
+    });
+    selectedId = data.artifact.id;
+    status.textContent = 'Saved just now';
+    save.textContent = 'Update artifact';
+    await loadList();
+    toast('Artifact saved in GENESIS.', 'good');
+  }));
+  refresh.addEventListener('click', preview);
+  fresh.addEventListener('click', reset);
+  const remove = h('button', { class: 'btn danger', type: 'button', text: 'Delete artifact' });
+  remove.addEventListener('click', () => guard(remove, async () => {
+    if (!selectedId || !confirm('Delete this artifact permanently?')) return;
+    await api('/api/artifacts/' + encodeURIComponent(selectedId), { method: 'DELETE' });
+    reset();
+    await loadList();
+    toast('Artifact deleted.');
+  }));
+  actions.append(remove);
+  source.addEventListener('input', () => { status.textContent = 'Unsaved changes'; });
+  preview();
+  try { await loadList(); } catch (e) { library.append(empty('Could not load artifacts', e.message)); }
 }
 
 async function renderSystem() {
