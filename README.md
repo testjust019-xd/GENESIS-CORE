@@ -93,7 +93,7 @@ The agent loop and mission execution are deliberately bounded. Only registered t
 
 ## Architecture and roadmap
 
-See [ROADMAP.md](ROADMAP.md), [docs/EXPERIENCE_ENGINE.md](docs/EXPERIENCE_ENGINE.md), [docs/INTERFACES.md](docs/INTERFACES.md), [docs/MODEL_CORE.md](docs/MODEL_CORE.md), [docs/TEST_BENCH.md](docs/TEST_BENCH.md) and [docs/FIRST_LAUNCH.md](docs/FIRST_LAUNCH.md).
+See [ROADMAP.md](ROADMAP.md), [docs/EXPERIENCE_ENGINE.md](docs/EXPERIENCE_ENGINE.md), [docs/EVIDENCE_GUIDED_EVOLUTION.md](docs/EVIDENCE_GUIDED_EVOLUTION.md), [docs/INTERFACES.md](docs/INTERFACES.md), [docs/MODEL_CORE.md](docs/MODEL_CORE.md), [docs/TEST_BENCH.md](docs/TEST_BENCH.md) and [docs/FIRST_LAUNCH.md](docs/FIRST_LAUNCH.md).
 
 ## License
 
