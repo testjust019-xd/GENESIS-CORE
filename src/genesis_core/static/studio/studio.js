@@ -653,6 +653,42 @@ async function renderEvolution() {
       h('thead', {}, h('tr', {}, ['When', 'Condition', 'Suite', 'Score', 'Passed'].map(t => h('th', { text: t })))), body)));
   }
 
+  const feedbackSection = h('section', { class: 'notice', style: 'margin-top:22px' },
+    h('div', { class: 'row' }, h('strong', { text: 'Evolution Feedback Loop' }),
+      h('span', { class: 'pill', text: 'read-only analysis' })),
+    h('p', { class: 'lead', text: 'Cross-check benchmark regressions, recurring task failures and repeated blocked experiences. Findings keep links to their original evidence; no Skill or memory is changed automatically.' }));
+  const feedbackActions = h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin:10px 0' });
+  const feedbackRun = h('button', { class: 'btn primary', type: 'button', text: 'Analyze improvement signals', onclick: () => guard(feedbackRun, async () => {
+    const report = await api('/api/evolution/feedback/analyze', { method: 'POST' });
+    toast(`Feedback scan: ${report.findings_count} finding(s).`);
+    renderFeedback(report);
+  }) });
+  feedbackActions.append(feedbackRun);
+  const feedbackResults = h('div', { style: 'display:grid;gap:10px' });
+  feedbackSection.append(feedbackActions, feedbackResults);
+  page.append(feedbackSection);
+
+  function renderFeedback(report) {
+    feedbackResults.replaceChildren();
+    if (!report.findings.length) {
+      feedbackResults.append(empty('No improvement signals found', 'Run more comparable benchmark baselines or complete additional tasks to build evidence.'));
+      return;
+    }
+    feedbackResults.append(h('p', { style: 'color:var(--dusk);font-size:13px', text: `${report.findings_count} finding(s) · ${report.sources.benchmark_runs_examined} benchmark runs · ${report.sources.experience_records_examined} experience records` }));
+    for (const finding of report.findings) {
+      const evidenceText = JSON.stringify(finding.evidence, null, 2);
+      feedbackResults.append(h('article', { class: 'notice' },
+        h('div', { class: 'row' }, h('strong', { text: finding.title }), h('span', { class: 'pill', text: finding.severity })),
+        h('p', { text: finding.summary }),
+        h('p', { style: 'color:var(--dusk);font-size:13px', text: finding.recommendation }),
+        h('details', {}, h('summary', { text: 'Inspect evidence' }), h('pre', { style: 'white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px', text: evidenceText }))));
+    }
+    feedbackResults.append(h('p', { style: 'color:var(--dusk);font-size:12px', text: 'Analysis is read-only. Re-run benchmarks to confirm signals; review every proposal before changing Skills.' }));
+  }
+  api('/api/evolution/feedback/latest').then(renderFeedback).catch(() => {
+    feedbackResults.append(empty('No feedback report yet', 'Run an analysis to inspect improvement signals.'));
+  });
+
   page.append(h('h3', { style: 'margin-top:28px', text: 'Experience → reviewed lessons' }),
     h('p', { class: 'lead', text: 'GENESIS groups only identical normalized task instructions. It does not infer a rule from one success, and nothing is activated automatically.' }));
   const controls = h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px' });

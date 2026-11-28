@@ -28,6 +28,7 @@ from genesis_core.learning import LearningEngine, LearningError
 from genesis_core.evaluation import EvaluationEngine
 from genesis_core.experience import ExperienceError, ExperienceStore
 from genesis_core.evolution import EvolutionEngine, EvolutionError
+from genesis_core.evolution_feedback import EvolutionFeedbackEngine, FeedbackError
 from genesis_core.skills import SkillError, SkillStore
 from genesis_core.state import StateStore
 from genesis_core.tools import ToolError
@@ -48,6 +49,7 @@ research_engine = ResearchEngine(store, knowledge_store)
 research_intelligence = ResearchIntelligence(store)
 learning_engine = LearningEngine(store)
 evaluation_engine = EvaluationEngine(store)
+feedback_engine = EvolutionFeedbackEngine(store, evaluation_engine, experience_store)
 STUDIO_DIR = Path(__file__).parent / "static" / "studio"
 STUDIO_FILES = {"studio.css": "text/css", "studio.js": "application/javascript"}
 skill_store = SkillStore(store.database_path, {item['name'] for item in tool_executor.registry.list()})
@@ -451,6 +453,22 @@ def promote_evolution_proposal(proposal_id: str) -> dict:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except SkillError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/evolution/feedback/analyze")
+def analyze_evolution_feedback() -> dict:
+    try:
+        return feedback_engine.analyze()
+    except FeedbackError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/evolution/feedback/latest")
+def latest_evolution_feedback() -> dict:
+    report = feedback_engine.latest()
+    if report is None:
+        raise HTTPException(status_code=404, detail="No feedback report has been generated")
+    return report
 
 
 @app.post("/api/memories/from-mission/{mission_id}")

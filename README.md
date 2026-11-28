@@ -98,3 +98,4 @@ See [ROADMAP.md](ROADMAP.md), [docs/EXPERIENCE_ENGINE.md](docs/EXPERIENCE_ENGINE
 ## License
 
 MIT. See [LICENSE](LICENSE).
+\n\nSee [Evolution Feedback Loop](docs/EVOLUTION_FEEDBACK_LOOP.md) for evidence-based improvement diagnostics.\n
