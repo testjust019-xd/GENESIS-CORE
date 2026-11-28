@@ -18,7 +18,7 @@ GENESIS CORE is its own agent environment. Local runtimes such as Ollama, llama.
 - **Resource-aware:** inspect hardware and adapt workloads to available resources.
 - **Evidence-based evolution:** evaluate skills and model versions instead of treating XP as proof of intelligence.
 - **Permissioned autonomy:** tools run with explicit capabilities, isolation and approval boundaries.
-- **Extensible:** optional providers, tools and specialist models.
+- **Extensible:** optional providers, tools, specialist models and sandboxed web artifacts.
 
 ## Requirements
 
@@ -93,7 +93,7 @@ The agent loop and mission execution are deliberately bounded. Only registered t
 
 ## Architecture and roadmap
 
-See [ROADMAP.md](ROADMAP.md), [docs/EXPERIENCE_ENGINE.md](docs/EXPERIENCE_ENGINE.md), [docs/EVIDENCE_GUIDED_EVOLUTION.md](docs/EVIDENCE_GUIDED_EVOLUTION.md), [docs/INTERFACES.md](docs/INTERFACES.md), [docs/MODEL_CORE.md](docs/MODEL_CORE.md), [docs/TEST_BENCH.md](docs/TEST_BENCH.md) and [docs/FIRST_LAUNCH.md](docs/FIRST_LAUNCH.md).
+See [ROADMAP.md](ROADMAP.md), [docs/ARTIFACT_ENGINE.md](docs/ARTIFACT_ENGINE.md), [docs/EXPERIENCE_ENGINE.md](docs/EXPERIENCE_ENGINE.md), [docs/EVIDENCE_GUIDED_EVOLUTION.md](docs/EVIDENCE_GUIDED_EVOLUTION.md), [docs/INTERFACES.md](docs/INTERFACES.md), [docs/MODEL_CORE.md](docs/MODEL_CORE.md), [docs/TEST_BENCH.md](docs/TEST_BENCH.md) and [docs/FIRST_LAUNCH.md](docs/FIRST_LAUNCH.md).
 
 ## License
 

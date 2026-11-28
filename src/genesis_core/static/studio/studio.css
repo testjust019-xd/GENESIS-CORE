@@ -270,3 +270,13 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14.5px; }
 .mobile-only { display: none; }
 @media (max-width: 760px) { .mobile-only { display: flex; } }
 .rail a.rail-btn { text-decoration: none; }
+
+
+/* ---------- Artifact Engine ---------- */
+.artifact-input { width:100%; min-height:44px; padding:10px 13px; border:1px solid var(--seam); border-radius:var(--r-m); background:var(--tide); color:var(--mist); }
+.artifact-source { display:block; width:100%; min-height:300px; resize:vertical; padding:14px; border:1px solid var(--seam); border-radius:var(--r-m); background:var(--ink); color:var(--mist); font:12.5px/1.6 var(--mono); tab-size:2; }
+.artifact-preview { display:block; width:100%; min-height:340px; border:1px solid var(--seam); border-radius:var(--r-m); background:#fff; }
+.artifact-item { display:grid; width:100%; gap:5px; padding:13px; margin:7px 0; text-align:left; border:1px solid var(--seam); border-radius:var(--r-m); background:var(--tide); color:var(--mist); }
+.artifact-item:hover,.artifact-item.selected { border-color:var(--state); background:var(--tide-2); }
+.artifact-item span,.artifact-item small { color:var(--dusk); font-size:12px; overflow-wrap:anywhere; }
+@media(max-width:900px) { #view-artifacts > .page > div { grid-template-columns:1fr !important; } .artifact-source { min-height:240px; } }
