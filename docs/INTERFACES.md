@@ -48,7 +48,7 @@ The TUI uses a dependency-free presentation layer (standard library only, so it 
 - animated "thinking" indicator; **Ctrl+C** cancels a reply and returns to the prompt, **Ctrl+D** quits
 - tool-activity trace after each reply and a pending-approvals notice above the prompt
 - Tab completion for slash commands and sub-commands, persistent input history (`~/.genesis/tui_history`)
-- the GENESIS avatar (idle/thinking/happy/alert/error faces) in the welcome panel, spinner and replies
+- the GENESIS avatar in four styles (orb default, robot, owl, spark; `/avatar <style>`, saved in settings) with wake-up blink on start (disable with `GENESIS_NO_ANIMATION=1`) and faces tied to events: working (tool running), alert (approval/cancel), happy (reply), error. Faces: idle/blink/thinking/working/happy/alert/error in the welcome panel, spinner and replies
 - live tool trace while the agent works and inline `[y/N]` approval of gated tools (`on_activity` / `on_approval` callbacks on `AgentRuntime.chat`; clients without them keep the approval queue)
 - multi-line input (end a line with `\`), reply footer with duration and an approximate token count
 - `/model` to list and switch the primary model, `/export` to save a conversation as Markdown

@@ -105,12 +105,14 @@ def run_tui() -> int:
                 print(ui.ok(f"Running {model_label} (managed by GENESIS)."))
             except NativeRuntimeError as exc:
                 print(ui.error(str(exc)))
+    ui.set_avatar_style((read_settings().get("avatar") or {}).get("style"))
     print()
-    print(ui.welcome_panel(
+    ui.play_intro(lambda state: ui.welcome_panel(
         __version__,
         (store.get_session(current) or {}).get("title", "New conversation"),
         model_label,
         str(genesis_home / "workspace"),
+        state=state,
     ))
     print()
 
@@ -211,6 +213,23 @@ def run_tui() -> int:
             print(ui.render_help(" ".join(args)))
         elif command == "/clear":
             ui.clear_screen()
+        elif command == "/avatar":
+            if args and args[0].lower() in ui.AVATAR_STYLES:
+                chosen = ui.set_avatar_style(args[0].lower())
+                settings_now = read_settings()
+                settings_now["avatar"] = {"style": chosen}
+                write_settings(settings_now)
+                print(ui.ok(f"Avatar set to {chosen}."))
+                print("\n".join("  " + line for line in ui.avatar_lines("happy")))
+            elif args:
+                print(ui.error(f"Unknown style '{args[0]}'. Choose: {', '.join(ui.AVATAR_STYLES)}."))
+            else:
+                print(ui.info(f"Current avatar: {ui.paint(ui.get_avatar_style(), 'bold')}"))
+                for name in ui.AVATAR_STYLES:
+                    art = ui.avatar_lines("idle", style=name)
+                    print(ui.paint(f"  {name}", "bright_yellow"))
+                    print("\n".join("    " + line for line in art))
+                print(ui.paint("  Change with /avatar <style>", "dim"))
         elif command == "/export":
             messages = store.list_messages(current) if current else []
             if not messages:

@@ -136,3 +136,26 @@ def test_eval_and_evolve_commands(monkeypatch, tmp_path):
     assert "fake/tiny" in out
     assert "Skill nope not found" in out
     assert re.search(r"Baseline score\s+\S+\s+\d+% → \d+%\s+\(1 run\(s\)", out)
+
+
+def test_avatar_command_persists_style(monkeypatch, tmp_path):
+    import json
+
+    settings = tmp_path / "settings.json"
+    monkeypatch.setenv("GENESIS_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("NO_COLOR", "1")
+    monkeypatch.setattr(tui, "read_settings", lambda: json.loads(settings.read_text()) if settings.exists() else {})
+    monkeypatch.setattr(tui, "write_settings", lambda data: settings.write_text(json.dumps(data)) or settings)
+    monkeypatch.setattr(tui, "discover_runtimes", lambda: [])
+    answers = iter(["/avatar", "/avatar owl", "/avatar dragon", "/quit"])
+    monkeypatch.setattr("builtins.input", lambda _="": next(answers))
+    buf = io.StringIO()
+    try:
+        with redirect_stdout(buf):
+            assert tui.run_tui() == 0
+    finally:
+        tui.ui.set_avatar_style(None)
+    out = buf.getvalue()
+    assert "Current avatar: orb" in out and "Avatar set to owl." in out
+    assert "Unknown style 'dragon'" in out
+    assert json.loads(settings.read_text())["avatar"]["style"] == "owl"

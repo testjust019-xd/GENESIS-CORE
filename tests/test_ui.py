@@ -72,18 +72,63 @@ def test_spinner_silent_when_not_tty():
 
 
 def test_avatar_states_and_widths():
-    for state in ("idle", "thinking", "happy", "alert", "error"):
-        lines = ui.avatar_lines(state, enabled=False)
-        assert len(lines) == 4 and {len(l) for l in lines} == {9}
-    assert "◉" in "".join(ui.avatar_lines("idle", enabled=False))
+    for style in ui.AVATAR_STYLES:
+        for state in ui.FACES:
+            lines = ui.avatar_lines(state, enabled=False, style=style)
+            assert len(lines) == 4 and len({len(l) for l in lines}) == 1, (style, state)
+    assert "◉" in "".join(ui.avatar_lines("idle", enabled=False, style="robot"))
+    assert "─" in ui.avatar_lines("blink", enabled=False, style="orb")[1]
     assert ui.mini_face("happy", enabled=False) == "(◕‿◕)"
+
+
+def test_avatar_style_selection_and_fallback():
+    try:
+        assert ui.set_avatar_style("owl") == "owl" and ui.get_avatar_style() == "owl"
+        assert ui.set_avatar_style("nope") == ui.DEFAULT_AVATAR == "orb"
+        assert ui.set_avatar_style(None) == "orb"
+    finally:
+        ui.set_avatar_style(None)
 
 
 def test_welcome_panel_shows_avatar_only_when_wide():
     wide = ui.welcome_panel("1", "S", "m", "/w", enabled=False, width=80)
     narrow = ui.welcome_panel("1", "S", "m", "/w", enabled=False, width=50)
-    assert "╰─┬─┬─╯" in wide and "╰─┬─┬─╯" not in narrow
+    assert "╲_____╱" in wide and "╲_____╱" not in narrow
     assert {len(l) for l in wide.splitlines()} == {80}
+    for style in ui.AVATAR_STYLES:
+        ui.set_avatar_style(style)
+        assert {len(l) for l in ui.welcome_panel("1", "S", "m", "/w", enabled=False, width=80).splitlines()} == {80}
+    ui.set_avatar_style(None)
+
+
+def test_play_intro_single_draw_when_not_tty():
+    out = io.StringIO()
+    states = []
+    ui.play_intro(lambda st: states.append(st) or "PANEL", out=out, sleep=lambda s: None)
+    assert out.getvalue() == "PANEL\n" and states == ["idle"]
+
+
+def test_play_intro_animates_on_tty(monkeypatch):
+    class TTY(io.StringIO):
+        def isatty(self):
+            return True
+
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.delenv("GENESIS_NO_ANIMATION", raising=False)
+    monkeypatch.setenv("TERM", "xterm")
+    out, states, pauses = TTY(), [], []
+    ui.play_intro(lambda st: states.append(st) or "L1\nL2", out=out, sleep=pauses.append)
+    # first render is a height probe, then one render per frame
+    assert states[1:] == ["blink", "idle", "blink", "happy", "idle"]
+    assert out.getvalue().count("\033[2A") == 4 and len(pauses) == 5
+    monkeypatch.setenv("GENESIS_NO_ANIMATION", "1")
+    quiet = TTY()
+    ui.play_intro(lambda st: "X", out=quiet, sleep=pauses.append)
+    assert quiet.getvalue() == "X\n"
+
+
+def test_event_faces():
+    assert "(◐▾◐)" in ui.format_tool_start({"tool": "t"}, enabled=False)
 
 
 def test_ask_approval_yes_no_and_eof():
