@@ -50,7 +50,7 @@ The editable install keeps the checkout connected to the installed `genesis` com
 Optional selectable-text PDF ingestion:
 
 ```bash
-python -m pip install -e ".[documents]"
+python -m pip install -e ".[web,dev,documents]"
 ```
 
 ## 4. Run the local checks first
