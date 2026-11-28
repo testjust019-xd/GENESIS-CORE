@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from genesis_core import __version__
 from genesis_core.config import get_search_settings, set_search_settings
 from genesis_core.agent import AgentRuntime, ModelError, build_default_tool_executor
+from genesis_core.artifacts import ArtifactError, ArtifactStore
 from genesis_core.hardware import inspect_hardware
 from genesis_core.models import discover_runtimes
 from genesis_core.missions import MissionError, MissionStore
@@ -51,6 +52,13 @@ evaluation_engine = EvaluationEngine(store)
 STUDIO_DIR = Path(__file__).parent / "static" / "studio"
 STUDIO_FILES = {"studio.css": "text/css", "studio.js": "application/javascript"}
 skill_store = SkillStore(store.database_path, {item['name'] for item in tool_executor.registry.list()})
+artifact_store = ArtifactStore(store.database_path)
+
+
+class ArtifactInput(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    description: str = Field(default='', max_length=500)
+    html: str = Field(min_length=1, max_length=200000)
 
 
 class CollaborationInput(BaseModel):
@@ -158,6 +166,46 @@ class MemoryInput(BaseModel):
     source_type: str = Field(default="user", min_length=1, max_length=80)
     source_ref: str = Field(default="", max_length=500)
     confidence: float = Field(default=0.8, ge=0, le=1)
+
+
+@app.get("/api/artifacts")
+def list_artifacts() -> dict:
+    return {"artifacts": artifact_store.list()}
+
+
+@app.post("/api/artifacts")
+def create_artifact(payload: ArtifactInput) -> dict:
+    try:
+        return {"artifact": artifact_store.create(payload.title, payload.html, payload.description)}
+    except ArtifactError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/artifacts/{artifact_id}")
+def get_artifact(artifact_id: str) -> dict:
+    item = artifact_store.get(artifact_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    return {"artifact": item}
+
+
+@app.put("/api/artifacts/{artifact_id}")
+def update_artifact(artifact_id: str, payload: ArtifactInput) -> dict:
+    try:
+        return {"artifact": artifact_store.update(artifact_id, payload.title, payload.html, payload.description)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Artifact not found") from exc
+    except ArtifactError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.delete("/api/artifacts/{artifact_id}")
+def delete_artifact(artifact_id: str) -> dict:
+    try:
+        artifact_store.delete(artifact_id)
+        return {"deleted": artifact_id}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Artifact not found") from exc
 
 
 @app.get("/api/status")
