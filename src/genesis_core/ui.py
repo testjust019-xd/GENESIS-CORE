@@ -98,43 +98,108 @@ def box(lines: Iterable[str], title: str = "", width: int | None = None,
 
 BACKSLASH = "\\"  # kept out of f-string expressions (invalid before Python 3.12)
 
-AVATAR_ART = (
-    " ╭─────╮ ",
-    " │ {e} {e} │ ",
-    " │  {m}  │ ",
-    " ╰─┬─┬─╯ ",
-)
+# Avatar styles: art templates with {e} (eye) and {m} (mouth) placeholders.
+# Rows are padded to equal width so any style fits the welcome panel.
+AVATAR_STYLES: dict[str, tuple[str, ...]] = {
+    "orb": (
+        "   ╭───╮   ",
+        "  ╱ {e} {e} ╲  ",
+        " │   {m}   │ ",
+        "  ╲_____╱  ",
+    ),
+    "robot": (
+        " ╭─────╮ ",
+        " │ {e} {e} │ ",
+        " │  {m}  │ ",
+        " ╰─┬─┬─╯ ",
+    ),
+    "owl": (
+        "  ╭─^─^─╮  ",
+        " ( {e}   {e} ) ",
+        "  ╰─ {m} ─╯  ",
+        "   ╱╲ ╱╲   ",
+    ),
+    "spark": (
+        "    ✦     ",
+        "  ╭─┴─╮   ",
+        " ─┤{e} {e}├─  ",
+        "  ╰─{m}─╯   ",
+    ),
+}
+DEFAULT_AVATAR = "orb"
+_avatar_style = DEFAULT_AVATAR
+
+
+def set_avatar_style(name: str | None) -> str:
+    """Select the avatar style (unknown names fall back to the default)."""
+    global _avatar_style
+    _avatar_style = name if name in AVATAR_STYLES else DEFAULT_AVATAR
+    return _avatar_style
+
+
+def get_avatar_style() -> str:
+    return _avatar_style
+
 
 # state -> (eyes, mouth)
 FACES = {
     "idle": ("◉", "▾"),
+    "blink": ("─", "▾"),
     "thinking": ("◔", "~"),
+    "working": ("◐", "▾"),
     "happy": ("◕", "‿"),
     "alert": ("◉", "o"),
     "error": ("✖", "▾"),
 }
 
 
-def avatar_lines(state: str = "idle", enabled: bool | None = None) -> list[str]:
-    """The GENESIS mascot as four lines, 9 columns wide."""
+def _face_style(state: str) -> str:
+    return "bright_yellow" if state == "alert" else "bright_red" if state == "error" else "bright_cyan"
+
+
+def avatar_lines(state: str = "idle", enabled: bool | None = None, style: str | None = None) -> list[str]:
+    """The GENESIS mascot as four equal-width lines in the selected style."""
     eyes, mouth = FACES.get(state, FACES["idle"])
-    style = "bright_yellow" if state == "alert" else "bright_red" if state == "error" else "bright_cyan"
-    rows = []
-    for row in AVATAR_ART:
-        row = row.format(e=eyes, m=mouth)
-        rows.append(paint(row, style, enabled=enabled))
-    return rows
+    art = AVATAR_STYLES.get(style or _avatar_style, AVATAR_STYLES[DEFAULT_AVATAR])
+    rows = [row.format(e=eyes, m=mouth) for row in art]
+    width = max(len(row) for row in rows)
+    return [paint(row.ljust(width), _face_style(state), enabled=enabled) for row in rows]
 
 
 def mini_face(state: str = "idle", enabled: bool | None = None) -> str:
-    """One-glyph-wide-ish face used beside replies: ``(◉▾◉)``."""
+    """Small inline face used beside replies and events: ``(◕‿◕)``."""
     eyes, mouth = FACES.get(state, FACES["idle"])
-    style = "bright_yellow" if state == "alert" else "bright_red" if state == "error" else "bright_cyan"
-    return paint(f"({eyes}{mouth}{eyes})", style, enabled=enabled)
+    return paint(f"({eyes}{mouth}{eyes})", _face_style(state), enabled=enabled)
+
+
+def animations_enabled(stream: TextIO | None = None) -> bool:
+    stream = stream or sys.stdout
+    return (bool(getattr(stream, "isatty", lambda: False)()) and os.environ.get("TERM") != "dumb"
+            and not os.environ.get("GENESIS_NO_ANIMATION") and not os.environ.get("NO_COLOR"))
+
+
+def play_intro(render, out: TextIO | None = None, sleep=time.sleep) -> None:
+    """Draw the welcome panel with a short wake-up blink (single draw if not a TTY).
+
+    ``render(state)`` must return the full panel text for an avatar state.
+    """
+    out = out or sys.stdout
+    if not animations_enabled(out):
+        out.write(render("idle") + "\n")
+        out.flush()
+        return
+    frames = ["blink", "idle", "blink", "happy", "idle"]
+    height = render("idle").count("\n") + 1
+    for index, state in enumerate(frames):
+        if index:
+            out.write(f"\033[{height}A")
+        out.write(render(state) + "\n")
+        out.flush()
+        sleep(0.18 if state == "blink" else 0.35)
 
 
 def welcome_panel(version: str, session_title: str, model: str, workspace: str,
-                  enabled: bool | None = None, width: int | None = None) -> str:
+                  enabled: bool | None = None, width: int | None = None, state: str = "idle") -> str:
     """Compact Claude-Code-style welcome panel with the GENESIS avatar."""
     b = lambda s: paint(s, "bold", enabled=enabled)  # noqa: E731
     d = lambda s: paint(s, "dim", enabled=enabled)  # noqa: E731
@@ -147,7 +212,7 @@ def welcome_panel(version: str, session_title: str, model: str, workspace: str,
     ]
     width = width or term_width()
     if width >= 60:
-        art = avatar_lines("idle", enabled)
+        art = avatar_lines(state, enabled)
         top = [f"{left} {right}" for left, right in zip(art, info_rows)]
     else:
         top = info_rows
@@ -186,7 +251,7 @@ def ask_approval(request: dict, input_fn=None, out: TextIO | None = None,
     out.write("\n" + approval_card(request, enabled=enabled) + "\n")
     out.flush()
     try:
-        answer = input_fn(paint("  Allow this action? [y/N] ", "bright_yellow", enabled=enabled)).strip().lower()
+        answer = input_fn("  " + mini_face("alert", enabled) + paint(" Allow this action? [y/N] ", "bright_yellow", enabled=enabled)).strip().lower()
     except (EOFError, KeyboardInterrupt):
         out.write("\n")
         return False
@@ -197,7 +262,7 @@ def format_tool_start(event: dict, enabled: bool | None = None) -> str:
     """Live line printed while a tool is running."""
     args = event.get("arguments") or {}
     brief = ", ".join(f"{k}={str(v)[:40]!r}" for k, v in list(args.items())[:2])
-    return (paint("  ⚙ ", "bright_cyan", enabled=enabled)
+    return ("  " + mini_face("working", enabled) + " "
             + paint(str(event.get("tool", "tool")), "bold", enabled=enabled)
             + (paint(f"  {brief}", "dim", enabled=enabled) if brief else ""))
 
@@ -414,6 +479,7 @@ HELP_SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
         ("/history", "Show current conversation"),
         ("/clear", "Clear the screen"),
         ("/export [path]", "Save this conversation as Markdown"),
+        ("/avatar [style]", "Show or change the GENESIS avatar (orb, robot, owl, spark)"),
     ]),
     ("Models & tools", [
         ("/models", "Inspect local model runtimes"),
@@ -473,7 +539,7 @@ HELP_SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
 ]
 
 SLASH_COMMANDS: list[str] = sorted({
-    "/new", "/sessions", "/open", "/history", "/clear", "/export", "/model", "/models", "/tools", "/tool",
+    "/new", "/sessions", "/open", "/history", "/clear", "/export", "/avatar", "/model", "/models", "/tools", "/tool",
     "/approvals", "/approval", "/memory", "/knowledge", "/research", "/learn",
     "/missions", "/mission", "/eval", "/evolve", "/help", "/quit", "/exit",
 })
@@ -484,6 +550,7 @@ SUBCOMMANDS: dict[str, list[str]] = {
     "/research": ["search", "sources", "review", "report", "reports"],
     "/learn": ["create", "list", "show", "answer", "attempts"],
     "/model": ["install", "use"],
+    "/avatar": ["orb", "robot", "owl", "spark"],
     "/eval": ["run", "skill", "compare", "show", "history"],
     "/mission": ["new", "status", "plan", "run", "tasks", "replan", "history"],
     "/approval": [],
