@@ -113,4 +113,4 @@ def test_pt_session_completer_and_toolbar(tmp_path):
     assert meta["/missions"]
     sub = list(session.completer.get_completions(Document("/mission pl"), None))
     assert [c.text for c in sub] == ["plan"] and sub[0].start_position == -2
-    assert session.complete_while_typing()
+    assert session.complete_while_typing
