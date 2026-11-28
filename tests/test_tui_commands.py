@@ -159,3 +159,58 @@ def test_avatar_command_persists_style(monkeypatch, tmp_path):
     assert "Current avatar: orb" in out and "Avatar set to owl." in out
     assert "Unknown style 'dragon'" in out
     assert json.loads(settings.read_text())["avatar"]["style"] == "owl"
+
+
+def test_approve_always_skips_next_prompt(monkeypatch, tmp_path):
+    import json
+    from types import SimpleNamespace
+
+    from genesis_core import agent as agent_module
+    from genesis_core.tools import ToolRegistry, ToolSpec
+
+    calls = []
+    registry_holder = {}
+    real_build = tui.build_core_registry
+
+    def build(workspace):
+        registry = real_build(workspace)
+        registry.register(ToolSpec(
+            "write_note", "Write a note", {"type": "object", "properties": {}, "additionalProperties": False},
+            lambda _a: calls.append(1) or {"ok": True},
+            capabilities=frozenset({"workspace_write"}), risk="write"))
+        return registry
+
+    class Fake:
+        config = SimpleNamespace(provider="fake", model="m")
+
+        def __init__(self):
+            self.turn = 0
+
+        def chat(self, messages):
+            self.turn += 1
+            if self.turn in (1, 3):
+                return json.dumps({"action": "tool", "tool": "write_note", "arguments": {}})
+            return json.dumps({"action": "final", "message": "done"})
+
+    home = tmp_path / "home"
+    (home / "config").mkdir(parents=True)
+    monkeypatch.setenv("GENESIS_HOME", str(home))
+    monkeypatch.setenv("NO_COLOR", "1")
+    monkeypatch.setattr(tui, "build_core_registry", build)
+    monkeypatch.setattr(tui, "discover_runtimes", lambda: [])
+    monkeypatch.setattr(agent_module, "create_chat_adapter", lambda: Fake())
+    answers = iter(["first request", "a", "second request", "/quit"])
+    prompts = []
+
+    def fake_input(prompt=""):
+        prompts.append(prompt)
+        return next(answers)
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        tui.run_tui()
+    out = buf.getvalue()
+    assert calls == [1, 1], out
+    assert "auto-approved for this session" in out
+    assert sum("Allow?" in p for p in prompts) == 1

@@ -8,7 +8,7 @@ import shlex
 import time
 from pathlib import Path
 from genesis_core.agent import AgentRuntime, ModelError
-from genesis_core import model_hub
+from genesis_core import model_hub, ui_pt
 from genesis_core.evaluation import EvaluationEngine, EvaluationError, evals_dir
 from genesis_core.adapters import ModelConfig, create_chat_adapter
 from genesis_core.config import read_settings, set_model, write_settings
@@ -92,6 +92,8 @@ def run_tui() -> int:
 
     history_path = genesis_home / "tui_history"
     ui.setup_readline(history_path)
+    auto_allow: set[str] = set()  # tools approved with "always" for this session only
+    pt_input = None
     model_label = _model_label()
     native = NativeRuntime()
 
@@ -105,6 +107,17 @@ def run_tui() -> int:
                 print(ui.ok(f"Running {model_label} (managed by GENESIS)."))
             except NativeRuntimeError as exc:
                 print(ui.error(str(exc)))
+    def toolbar() -> str:
+        latest = evaluator.history(limit=1)
+        return ui.toolbar_text(model_label, (store.get_session(current) or {}).get("title", "No session"),
+                               len(tool_registry.list()), len(approvals.list()),
+                               latest[0]["score"] if latest else None)
+
+    if ui_pt.should_use():
+        try:
+            pt_input = ui_pt.make_input(genesis_home / "tui_history_pt", toolbar)
+        except Exception:  # never let the optional UI break the plain prompt
+            pt_input = None
     ui.set_avatar_style((read_settings().get("avatar") or {}).get("style"))
     print()
     ui.play_intro(lambda state: ui.welcome_panel(
@@ -123,7 +136,7 @@ def run_tui() -> int:
             pending = len(approvals.list())
             if pending:
                 print(ui.status_line(model_label, len(tool_registry.list()), pending))
-            raw = ui.read_multiline(ui.prompt_string(label))
+            raw = ui.read_multiline(ui.prompt_string(label, markers=pt_input is None), input_fn=pt_input)
         except EOFError:
             print("\n" + ui.info("Leaving GENESIS TUI."))
             ui.save_history(history_path)
@@ -168,7 +181,14 @@ def run_tui() -> int:
             def on_approval(request: dict) -> bool:
                 spinner.stop()
                 stream.finish()
-                return ui.ask_approval(request)
+                if request.get("tool") in auto_allow:
+                    print(ui.paint(f"  ↻ {request.get('tool')} auto-approved for this session", "dim"))
+                    return True
+                diff = ui.build_write_diff(request.get("arguments") or {}, genesis_home / "workspace")
+                choice = ui.ask_approval_choice({**request, "diff": diff} if diff else request, input_fn=pt_input)
+                if choice == "always":
+                    auto_allow.add(str(request.get("tool")))
+                return choice in {"yes", "always"}
 
             try:
                 with spinner:

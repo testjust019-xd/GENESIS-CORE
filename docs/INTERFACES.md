@@ -54,6 +54,8 @@ The TUI uses a dependency-free presentation layer (standard library only, so it 
 - `/model` to list and switch the primary model, `/export` to save a conversation as Markdown
 - **native models, no Ollama needed:** `/model install` recommends a GGUF model for the device's RAM, downloads it from Hugging Face (resumable, size-checked, HTTPS to huggingface.co only) into `~/.genesis/models`, and GENESIS starts and stops its own `llama-server` (llama.cpp) on a loopback port. `/model use` starts a downloaded model; with no other model configured it starts automatically on the first message. The engine itself must be installed once (`pkg install llama-cpp` on Termux; or set `GENESIS_LLAMA_SERVER`)
 - **Evolution Lab:** `/eval run` measures the model on a fixed rule-based suite, `/eval skill <id>` compares baseline vs with-skill and stores the evidence (shown when you approve a skill), `/evolve` reports the score timeline, skills and memory. Add suites as JSON in `~/.genesis/evals`. Scores are measured behaviour on that suite, not weight changes
+- syntax-coloured code blocks (Python, shell, JS/JSON), coloured diffs in approval cards for file-writing tools (read only inside the workspace) and `[a]lways` to auto-approve a tool for the current session only
+- **optional rich prompt** (`pip install "genesis-core[pro]"`): live slash-command menu with descriptions as you type, a bottom status bar (model, session, tools, last benchmark, pending approvals) and Alt+Enter for a new line. Used only on a real terminal; otherwise (or with `GENESIS_NO_PT=1`) the plain readline prompt is kept
 - grouped, filterable help (`/help <text>`) and `/clear`
 - colour is disabled automatically when output is not a terminal or `NO_COLOR` is set
 
