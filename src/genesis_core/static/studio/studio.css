@@ -280,3 +280,95 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14.5px; }
 .artifact-item:hover,.artifact-item.selected { border-color:var(--state); background:var(--tide-2); }
 .artifact-item span,.artifact-item small { color:var(--dusk); font-size:12px; overflow-wrap:anywhere; }
 @media(max-width:900px) { #view-artifacts > .page > div { grid-template-columns:1fr !important; } .artifact-source { min-height:240px; } }
+
+
+/* ---------- Motion system and Artifact Engine polish ---------- */
+@keyframes genesis-rise-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes genesis-soft-glow {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--state) 12%, transparent); }
+  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--state) 38%, transparent), 0 12px 38px -24px var(--state); }
+}
+@keyframes genesis-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.page { animation: genesis-rise-in .32s ease-out both; }
+.rail-btn svg, .btn, .icon-btn, .artifact-input, .artifact-item, .artifact-preview {
+  transition: border-color .18s ease, background-color .18s ease, color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+.artifact-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, .72fr) minmax(0, 1.5fr);
+  gap: 18px;
+  align-items: start;
+}
+.artifact-library {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-l);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--state) 7%, var(--tide)), var(--tide) 62%);
+  animation: genesis-rise-in .38s ease-out both;
+}
+.artifact-editor { min-width: 0; animation: genesis-rise-in .44s ease-out both; }
+.artifact-fields { margin-bottom: 14px; }
+.artifact-fields label { display: grid; gap: 6px; color: var(--dusk); font-size: 13px; }
+.artifact-input { min-width: 0; }
+.artifact-input:focus, .artifact-source:focus {
+  outline: 2px solid color-mix(in srgb, var(--state) 60%, transparent);
+  outline-offset: 2px;
+  border-color: var(--state);
+}
+.artifact-code-bar, .artifact-preview-bar { justify-content: space-between; margin: 14px 0 8px; }
+.artifact-code-bar .sub { font-size: 12px; }
+.artifact-source {
+  min-height: 360px;
+  line-height: 1.65;
+  border-color: color-mix(in srgb, var(--state) 20%, var(--seam));
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.artifact-source:focus { box-shadow: 0 0 28px -18px var(--state); }
+.artifact-actions { margin-top: 12px; align-items: center; }
+.artifact-actions .artifact-status { flex: 1 1 180px; font-size: 12px; }
+.artifact-size { font-variant-numeric: tabular-nums; }
+.artifact-size.over-limit { color: var(--coral); border-color: var(--coral); }
+.artifact-preview {
+  min-height: 380px;
+  border-color: color-mix(in srgb, var(--state) 25%, var(--seam));
+  box-shadow: 0 16px 42px -30px rgba(0,0,0,.75);
+  animation: genesis-soft-glow 5s ease-in-out infinite;
+}
+.artifact-preview:focus-visible { outline-offset: 4px; }
+.artifact-item {
+  animation: genesis-rise-in .25s ease-out both;
+}
+.artifact-item:nth-of-type(2) { animation-delay: .035s; }
+.artifact-item:nth-of-type(3) { animation-delay: .07s; }
+.artifact-item:nth-of-type(4) { animation-delay: .105s; }
+.artifact-item:hover { transform: translateY(-2px); }
+.artifact-item.selected { box-shadow: inset 3px 0 0 var(--state); }
+.artifact-item span, .artifact-item small { display: block; }
+.btn:active, .icon-btn:active { transform: scale(.97); }
+@media (max-width: 900px) {
+  .artifact-layout { grid-template-columns: minmax(0, 1fr); }
+  .artifact-source { min-height: 280px; }
+  .artifact-preview { min-height: 320px; }
+}
+@media (max-width: 560px) {
+  .artifact-actions { align-items: stretch; }
+  .artifact-actions .btn { flex: 1 1 40%; }
+  .artifact-actions .artifact-status { flex-basis: 100%; }
+  .artifact-code-bar { align-items: flex-start; flex-direction: column; }
+  .artifact-preview { min-height: 280px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

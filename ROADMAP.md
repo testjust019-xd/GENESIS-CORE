@@ -141,7 +141,9 @@ This roadmap describes intended work. A feature is complete only when implemente
 
 ## Milestone 9 — Artifact Engine
 - [x] Local artifact storage in the shared SQLite database
-- [x] Studio HTML/CSS/JavaScript editor with live sandboxed preview
+- [x] Studio HTML/CSS/JavaScript editor with debounced live sandboxed preview
+- [x] Artifact editor keyboard shortcuts, unsaved-change guards and source-size feedback
+- [x] Responsive Artifact workspace with subtle motion and reduced-motion support
 - [x] Artifact create, list, open, update and delete API
 - [x] Restrictive preview CSP and iframe isolation without same-origin privileges
 - [ ] Agent-assisted artifact generation with explicit review

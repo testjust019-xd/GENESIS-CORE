@@ -709,61 +709,158 @@ async function renderEvolution() {
 
 async function renderArtifacts() {
   const view = $('#view-artifacts');
-  const page = pageShell('Artifact Engine', 'Build and keep small web experiences inside GENESIS. Preview runs in a sandboxed frame; artifacts stay in your local GENESIS database.');
+  const page = pageShell(
+    'Artifact Engine',
+    'Build small web experiences in GENESIS. Edit HTML, preview changes instantly and keep everything in your local database.'
+  );
   view.replaceChildren(page);
-  const layout = h('div', { style: 'display:grid;grid-template-columns:minmax(220px,.72fr) minmax(0,1.5fr);gap:18px;align-items:start' });
-  const library = h('section', { class: 'notice' });
-  const editor = h('section', {});
+
+  const layout = h('div', { class: 'artifact-layout' });
+  const library = h('section', { class: 'artifact-library' });
+  const editor = h('section', { class: 'artifact-editor' });
   layout.append(library, editor);
   page.append(layout);
-  const title = h('input', { type: 'text', maxlength: '120', placeholder: 'Artifact title', class: 'artifact-input' });
-  const description = h('input', { type: 'text', maxlength: '500', placeholder: 'Short description', class: 'artifact-input' });
-  const source = h('textarea', { class: 'artifact-source', spellcheck: 'false', 'aria-label': 'HTML source' });
-  source.value = '<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>My artifact</title><style>body{font:16px system-ui;padding:2rem;background:#101827;color:#eef4ff}button{padding:.7rem 1rem;border:0;border-radius:9px;background:#70d9bd;color:#07130f;cursor:pointer}</style></head>\n<body><h1>Hello from GENESIS</h1><p>Edit this HTML and preview it live.</p><button onclick="document.querySelector(\'p\').textContent=\'It works!\'">Try it</button></body>\n</html>';
-  const frame = h('iframe', { class: 'artifact-preview', title: 'Sandboxed artifact preview', sandbox: 'allow-scripts' });
-  const actions = h('div', { class: 'bar' });
+
+  const starter = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My GENESIS artifact</title>
+  <style>
+    body { font: 16px system-ui; padding: 2rem; background: #101827; color: #eef4ff; }
+    button { padding: .7rem 1rem; border: 0; border-radius: 9px; background: #70d9bd; color: #07130f; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Hello from GENESIS</h1>
+  <p>Edit this HTML and watch the preview update.</p>
+  <button onclick="document.querySelector('p').textContent = 'It works!'">Try it</button>
+</body>
+</html>`;
+
+  const title = h('input', {
+    type: 'text', maxlength: '120', placeholder: 'Artifact title',
+    class: 'artifact-input', autocomplete: 'off', 'aria-label': 'Artifact title',
+  });
+  const description = h('input', {
+    type: 'text', maxlength: '500', placeholder: 'Short description',
+    class: 'artifact-input', autocomplete: 'off', 'aria-label': 'Artifact description',
+  });
+  const source = h('textarea', {
+    class: 'artifact-source', spellcheck: 'false', autocapitalize: 'off',
+    autocomplete: 'off', autocorrect: 'off', 'aria-label': 'HTML source',
+  });
+  source.value = starter;
+
+  const frame = h('iframe', {
+    class: 'artifact-preview', title: 'Sandboxed artifact preview', sandbox: 'allow-scripts',
+    loading: 'lazy',
+  });
+  const actions = h('div', { class: 'bar artifact-actions' });
   const save = h('button', { class: 'btn primary', type: 'button', text: 'Save artifact' });
-  const fresh = h('button', { class: 'btn', type: 'button', text: 'New' });
-  const refresh = h('button', { class: 'btn', type: 'button', text: 'Refresh preview' });
-  const status = h('span', { class: 'sub', text: 'Unsaved artifact' });
-  actions.append(save, fresh, refresh, status);
-  editor.append(h('div', { class: 'form' }, h('label', {}, 'Title', title), h('label', {}, 'Description', description)),
-    h('div', { class: 'bar' }, h('strong', { text: 'HTML editor' }), refresh),
-    source, actions, h('h3', { style: 'margin-top:24px', text: 'Live preview' }), frame);
+  const fresh = h('button', { class: 'btn', type: 'button', text: 'New artifact' });
+  const refresh = h('button', { class: 'btn', type: 'button', text: 'Refresh now' });
+  const remove = h('button', { class: 'btn danger', type: 'button', text: 'Delete' });
+  const status = h('span', { class: 'sub artifact-status', text: 'New · not saved' });
+  const size = h('span', { class: 'pill artifact-size', text: '0 / 200 KB' });
+  actions.append(save, fresh, remove, status, size);
+
+  const previewBar = h('div', { class: 'bar artifact-preview-bar' },
+    h('strong', { text: 'Live preview' }),
+    h('span', { class: 'pill', text: 'Sandboxed · local only' }),
+    refresh
+  );
+  editor.append(
+    h('div', { class: 'form artifact-fields' },
+      h('label', {}, 'Name', title),
+      h('label', {}, 'Description', description)
+    ),
+    h('div', { class: 'bar artifact-code-bar' },
+      h('strong', { text: 'HTML editor' }),
+      h('span', { class: 'sub', text: 'Ctrl/⌘ + Enter to refresh · Ctrl/⌘ + S to save' })
+    ),
+    source,
+    actions,
+    previewBar,
+    frame
+  );
+
   let selectedId = null;
   let items = [];
+  let dirty = false;
+  let previewTimer = null;
+
   const preview = () => {
+    clearTimeout(previewTimer);
     const policy = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'\">";
-    frame.srcdoc = '<!doctype html>' + policy + source.value;
+    const html = source.value.trimStart();
+    frame.srcdoc = /<head\b/i.test(html)
+      ? html.replace(/<head\b[^>]*>/i, head => head + policy)
+      : /<!doctype[^>]*>/i.test(html)
+        ? html.replace(/<!doctype[^>]*>/i, doctype => doctype + policy)
+        : policy + html;
   };
-  const reset = () => {
+  const updateSize = () => {
+    const bytes = new TextEncoder().encode(source.value).length;
+    size.textContent = (bytes / 1024).toFixed(1) + ' / 200 KB';
+    size.classList.toggle('over-limit', bytes > 200000);
+    return bytes;
+  };
+  const markDirty = () => {
+    dirty = true;
+    status.textContent = 'Unsaved changes · preview updates automatically';
+    updateSize();
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(preview, 450);
+  };
+  const reset = (force = false) => {
+    if (dirty && !force && !confirm('Discard your unsaved changes?')) return;
     selectedId = null;
+    dirty = false;
     title.value = '';
     description.value = '';
-    status.textContent = 'Unsaved artifact';
+    source.value = starter;
+    status.textContent = 'New · not saved';
     save.textContent = 'Save artifact';
+    updateSize();
     preview();
     renderList();
   };
   const select = async id => {
+    if (dirty && !confirm('Discard your unsaved changes and open this artifact?')) return;
     try {
       const data = await api('/api/artifacts/' + encodeURIComponent(id));
       selectedId = id;
+      dirty = false;
       title.value = data.artifact.title;
       description.value = data.artifact.description || '';
       source.value = data.artifact.html;
       status.textContent = 'Saved · ' + ago(data.artifact.updated_at);
       save.textContent = 'Update artifact';
+      updateSize();
       preview();
       renderList();
     } catch (e) { toast(e.message, 'bad'); }
   };
   const renderList = () => {
-    library.replaceChildren(h('div', { class: 'bar' }, h('strong', { text: 'Your artifacts' }), h('span', { class: 'pill', text: String(items.length) })));
+    library.replaceChildren(
+      h('div', { class: 'bar' },
+        h('strong', { text: 'Your artifacts' }),
+        h('span', { class: 'pill', text: String(items.length) })
+      )
+    );
     if (!items.length) library.append(empty('No artifacts yet', 'Create an HTML experience and save it here.'));
     for (const item of items) {
-      const open = h('button', { class: 'artifact-item' + (item.id === selectedId ? ' selected' : ''), type: 'button', onclick: () => select(item.id) },
-        h('strong', { text: item.title }), h('span', { text: item.description || 'HTML artifact' }), h('small', { text: ago(item.updated_at) }));
+      const open = h('button', {
+        class: 'artifact-item' + (item.id === selectedId ? ' selected' : ''),
+        type: 'button', 'aria-current': item.id === selectedId ? 'true' : null,
+        onclick: () => select(item.id),
+      },
+        h('strong', { text: item.title }),
+        h('span', { text: item.description || 'HTML artifact' }),
+        h('small', { text: ago(item.updated_at) })
+      );
       library.append(open);
     }
   };
@@ -772,31 +869,51 @@ async function renderArtifacts() {
     items = data.artifacts;
     renderList();
   };
-  save.addEventListener('click', () => guard(save, async () => {
-    const payload = { title: title.value, description: description.value, html: source.value };
+  const saveArtifact = async () => {
+    if (!title.value.trim()) {
+      title.focus();
+      throw new Error('Give your artifact a name before saving.');
+    }
+    if (updateSize() > 200000) throw new Error('This artifact is larger than the 200 KB limit.');
+    const payload = { title: title.value.trim(), description: description.value.trim(), html: source.value };
     const data = await api(selectedId ? '/api/artifacts/' + encodeURIComponent(selectedId) : '/api/artifacts', {
       method: selectedId ? 'PUT' : 'POST', body: payload,
     });
     selectedId = data.artifact.id;
+    dirty = false;
     status.textContent = 'Saved just now';
     save.textContent = 'Update artifact';
     await loadList();
     toast('Artifact saved in GENESIS.', 'good');
-  }));
+  };
+
+  save.addEventListener('click', () => guard(save, saveArtifact));
   refresh.addEventListener('click', preview);
-  fresh.addEventListener('click', reset);
-  const remove = h('button', { class: 'btn danger', type: 'button', text: 'Delete artifact' });
+  fresh.addEventListener('click', () => reset());
   remove.addEventListener('click', () => guard(remove, async () => {
-    if (!selectedId || !confirm('Delete this artifact permanently?')) return;
+    if (!selectedId) throw new Error('Select a saved artifact first.');
+    if (!confirm('Delete this artifact permanently?')) return;
     await api('/api/artifacts/' + encodeURIComponent(selectedId), { method: 'DELETE' });
-    reset();
+    reset(true);
     await loadList();
     toast('Artifact deleted.');
   }));
-  actions.append(remove);
-  source.addEventListener('input', () => { status.textContent = 'Unsaved changes'; });
+  for (const field of [title, description, source]) field.addEventListener('input', markDirty);
+  source.addEventListener('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      event.preventDefault();
+      preview();
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      guard(save, saveArtifact);
+    }
+  });
+
+  updateSize();
   preview();
-  try { await loadList(); } catch (e) { library.append(empty('Could not load artifacts', e.message)); }
+  try { await loadList(); }
+  catch (e) { library.append(empty('Could not load artifacts', e.message)); }
 }
 
 async function renderSystem() {

@@ -18,5 +18,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev,web]"
+      - name: Check Studio JavaScript syntax
+        run: node --check src/genesis_core/static/studio/studio.js
       - name: Run tests
         run: pytest -q
