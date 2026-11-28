@@ -117,6 +117,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 ## Milestone 6 — Training and evolution
 - [ ] Dataset curation and consent / licensing checks
 - [x] Initial baseline benchmark suite and score timeline (`/eval run`, `/evolve`)
+- [x] Read-only Evolution Feedback Loop for benchmark regressions, recurring failures, skill evaluation warnings and repeated experience blockers
 - [ ] Optional LoRA training integrations
 - [ ] Compare base and candidate checkpoints
 - [ ] Regression gates and rollback
