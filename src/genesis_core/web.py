@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 import queue
 import threading
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from genesis_core import __version__
@@ -24,6 +25,7 @@ from genesis_core.knowledge import KnowledgeError, KnowledgeStore
 from genesis_core.research import ResearchEngine, ResearchError
 from genesis_core.research_intelligence import ResearchIntelligence, ResearchIntelligenceError
 from genesis_core.learning import LearningEngine, LearningError
+from genesis_core.evaluation import EvaluationEngine
 from genesis_core.experience import ExperienceError, ExperienceStore
 from genesis_core.skills import SkillError, SkillStore
 from genesis_core.state import StateStore
@@ -43,6 +45,9 @@ knowledge_store = KnowledgeStore(store)
 research_engine = ResearchEngine(store, knowledge_store)
 research_intelligence = ResearchIntelligence(store)
 learning_engine = LearningEngine(store)
+evaluation_engine = EvaluationEngine(store)
+STUDIO_DIR = Path(__file__).parent / "static" / "studio"
+STUDIO_FILES = {"studio.css": "text/css", "studio.js": "application/javascript"}
 skill_store = SkillStore(store.database_path, {item['name'] for item in tool_executor.registry.list()})
 
 
@@ -236,7 +241,10 @@ def stream_message(session_id: str, payload: MessageInput):
 
     def run_agent() -> None:
         try:
-            reply = agent.chat(session_id, payload.content, on_token=publish)
+            reply = agent.chat(
+                session_id, payload.content, on_token=publish,
+                on_activity=lambda event: events.put({"type": "activity", "event": event}),
+            )
             events.put({
                 "type": "done",
                 "message": reply.user_message,
@@ -745,10 +753,45 @@ def decide_approval(approval_id: str, payload: ApprovalDecisionInput) -> dict:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.get("/", response_class=HTMLResponse)
-def studio() -> str:
+@app.get("/api/skills/{skill_id}/evidence")
+def skill_evidence(skill_id: str) -> dict:
+    if skill_store.get(skill_id) is None:
+        raise HTTPException(status_code=404, detail="Skill not found")
+    return {"evidence": evaluation_engine.skill_evidence(skill_id)}
+
+
+@app.get("/api/evolution")
+def evolution() -> dict:
+    """Measured progress: baseline score timeline, recent benchmark runs and counts."""
+    return {
+        "timeline": evaluation_engine.timeline("core-basics"),
+        "runs": evaluation_engine.history(limit=15),
+        "counts": {
+            "skills_active": len(skill_store.list("active")),
+            "memories": len(memory_store.list()),
+            "documents": len(knowledge_store.list_documents()),
+        },
+    }
+
+
+@app.get("/", response_class=FileResponse)
+def studio() -> FileResponse:
+    return FileResponse(STUDIO_DIR / "index.html", media_type="text/html")
+
+
+@app.get("/studio/{name}")
+def studio_asset(name: str) -> FileResponse:
+    media_type = STUDIO_FILES.get(name)
+    if media_type is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(STUDIO_DIR / name, media_type=media_type)
+
+
+@app.get("/classic", response_class=HTMLResponse)
+def classic_studio() -> str:
+    """Previous single-file Studio: knowledge, research, learning and experiences."""
     return HTML
-  
+
 
 HTML = r"""<!doctype html>
 <html lang="en">

@@ -77,6 +77,18 @@ The graphical interface is launched locally through a command such as `genesis s
 
 Studio is a first-party GENESIS interface, not the model provider's UI.
 
+### Studio v2 (current implementation)
+
+`genesis studio` serves a redesigned, fully offline interface (static files in `src/genesis_core/static/studio/`, no CDN fonts or scripts):
+
+- a living orb whose state (idle, thinking, working, happy, alert, error) tints the whole UI
+- streaming chat with live tool chips (`activity` SSE events), copyable code blocks and a slash menu
+- Ctrl+K command palette, conversations sheet, light/dark theme, phone layout with bottom bar
+- Missions, Memory, Skills (with benchmark evidence), Evolution (measured score timeline from `GET /api/evolution`) and System views
+- an inspector panel with approval cards for pending tool permissions
+
+The previous single-page interface remains at `/classic` and still hosts Knowledge, Research, Learning and Experiences until they are ported.
+
 ## Shared local API
 
 The interfaces communicate with the same local engine through a versioned API and event stream. The API is an internal boundary first; it may later be documented for external integrations.
