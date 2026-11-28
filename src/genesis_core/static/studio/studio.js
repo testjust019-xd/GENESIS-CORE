@@ -797,7 +797,9 @@ async function renderArtifacts() {
     const html = source.value.trimStart();
     frame.srcdoc = /<head\b/i.test(html)
       ? html.replace(/<head\b[^>]*>/i, head => head + policy)
-      : html.replace(/<!doctype[^>]*>/i, doctype => doctype + policy);
+      : /<!doctype[^>]*>/i.test(html)
+        ? html.replace(/<!doctype[^>]*>/i, doctype => doctype + policy)
+        : policy + html;
   };
   const updateSize = () => {
     const bytes = new TextEncoder().encode(source.value).length;
