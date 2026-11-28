@@ -15,6 +15,8 @@ class Adapter:
         self.answer = answer
 
     def chat(self, messages):
+        if isinstance(self.answer, dict):
+            return self.answer.get(messages[-1]["content"], "wrong")
         return self.answer
 
 
@@ -29,7 +31,10 @@ SUITE = validate_suite({
 
 def test_feedback_detects_regression_and_repeated_failures(tmp_path):
     state = StateStore(tmp_path / "genesis.db")
-    evaluations = EvaluationEngine(state, Adapter("ok"), suites={"feedback-mini": SUITE})
+    evaluations = EvaluationEngine(
+        state, Adapter({"stable?": "ok", "fragile?": "wrong"}),
+        suites={"feedback-mini": SUITE},
+    )
     first = evaluations.run_suite("feedback-mini", label="baseline")
     evaluations.adapter = Adapter("wrong")
     second = evaluations.run_suite("feedback-mini", label="baseline")
@@ -43,7 +48,7 @@ def test_feedback_detects_regression_and_repeated_failures(tmp_path):
     regression = next(x for x in report["findings"] if x["kind"] == "benchmark_regression")
     assert regression["evidence"]["previous_run_id"] == first["id"]
     assert regression["evidence"]["latest_run_id"] == second["id"]
-    assert set(regression["evidence"]["regressed_tasks"]) == {"stable", "fragile"}
+    assert set(regression["evidence"]["regressed_tasks"]) == {"stable"}
     assert feedback.latest()["id"] == report["id"]
 
 
