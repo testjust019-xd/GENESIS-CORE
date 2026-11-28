@@ -27,6 +27,7 @@ from genesis_core.research_intelligence import ResearchIntelligence, ResearchInt
 from genesis_core.learning import LearningEngine, LearningError
 from genesis_core.evaluation import EvaluationEngine
 from genesis_core.experience import ExperienceError, ExperienceStore
+from genesis_core.evolution import EvolutionEngine, EvolutionError
 from genesis_core.skills import SkillError, SkillStore
 from genesis_core.state import StateStore
 from genesis_core.tools import ToolError
@@ -39,6 +40,7 @@ mission_store = MissionStore(state=store)
 multi_agent_engine = MultiAgentEngine(store)
 mission_engine = MissionEngine(store, mission_store, agent, multi_agent=multi_agent_engine)
 experience_store = ExperienceStore(store)
+evolution_engine = EvolutionEngine(store, experience_store)
 memory_store = MemoryStore(store)
 conversation_memory = ConversationMemoryEngine(store, memory_store)
 knowledge_store = KnowledgeStore(store)
@@ -76,6 +78,16 @@ class MissionStatusInput(BaseModel):
 
 class ExperienceStatusInput(BaseModel):
     status: str = Field(pattern="^(captured|reviewed|archived)$")
+
+
+class EvolutionAnalyzeInput(BaseModel):
+    min_support: int = Field(default=2, ge=2, le=20)
+    limit: int = Field(default=200, ge=1, le=200)
+
+
+class EvolutionDecisionInput(BaseModel):
+    decision: str = Field(pattern="^(accept|reject)$")
+    note: str = Field(default="", max_length=1000)
 
 
 class MemoryCandidateDecisionInput(BaseModel):
@@ -391,6 +403,53 @@ def update_experience_status(
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Experience not found") from exc
     except ExperienceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/evolution/analyze")
+def analyze_evolution(payload: EvolutionAnalyzeInput) -> dict:
+    try:
+        return evolution_engine.analyze(
+            min_support=payload.min_support, limit=payload.limit
+        )
+    except EvolutionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/evolution/proposals")
+def list_evolution_proposals(status: str | None = None, limit: int = 50) -> dict:
+    try:
+        items = evolution_engine.list(status=status, limit=limit)
+        return {"proposals": items, "count": len(items)}
+    except EvolutionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/evolution/proposals/{proposal_id}/review")
+def review_evolution_proposal(
+    proposal_id: str, payload: EvolutionDecisionInput
+) -> dict:
+    try:
+        return {"proposal": evolution_engine.decide(
+            proposal_id, payload.decision, payload.note
+        )}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Evolution proposal not found") from exc
+    except EvolutionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/evolution/proposals/{proposal_id}/skill-draft")
+def promote_evolution_proposal(proposal_id: str) -> dict:
+    try:
+        return {"skill": evolution_engine.promote_to_skill_draft(
+            proposal_id, skill_store
+        )}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Evolution proposal not found") from exc
+    except EvolutionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except SkillError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 

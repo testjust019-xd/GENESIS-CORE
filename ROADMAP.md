@@ -57,7 +57,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Explicit capture of fully completed missions into episodic memory using persisted observer-checked outcomes (initial)
 - [x] Initial Experience Engine captures each mission task attempt with observer outcome and provenance
 - [x] Studio experience explorer with outcome/status filters, evidence detail and review/archive controls
-- [ ] Experience deduplication, retrieval and reviewed lesson synthesis
+- [x] Initial exact-context experience grouping and human-reviewed lesson proposals (provenance retained; no automatic promotion)
 - [x] User-triggered conversation memory proposals with exact user-message evidence and explicit review (initial)
 - [ ] Verified conversation/session summarisation into episodic memory
 - [x] Initial user-directed learning curricula and persistent practice attempts
@@ -110,6 +110,7 @@ This roadmap describes intended work. A feature is complete only when implemente
 - [x] Immutable version snapshots and safe manifest import/export (initial)
 - [ ] Skill execution harness with isolated, permissioned tool workflows
 - [x] Initial automated skill evaluation: deterministic benchmark suites, baseline vs with-skill comparison and stored evidence (`/eval`)
+- [x] Accepted evidence proposals can create non-active Skill drafts; existing human review is still required
 - [ ] Regression gates that block activation and larger benchmark suites
 - [ ] Skill marketplace and signing / trust metadata
 

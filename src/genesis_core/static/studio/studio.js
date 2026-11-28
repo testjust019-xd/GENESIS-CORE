@@ -635,23 +635,74 @@ function chart(points) {
 
 async function renderEvolution() {
   const view = $('#view-evolution');
-  const page = pageShell('Evolution', 'GENESIS does not change the model itself. It gets better through what you teach it, and this page measures whether that is really working.');
+  const page = pageShell('Evolution', 'GENESIS learns from evidence, not guesses. Repeated task outcomes can become reviewable lessons and, only after approval, draft Skills.');
   view.replaceChildren(page);
   let d;
   try { d = await api('/api/evolution'); } catch (e) { page.append(empty('Could not load progress', e.message)); return; }
   const c = d.counts;
   page.append(h('p', { style: 'margin:0 0 18px;color:var(--dusk)' }, `${c.skills_active} active ${c.skills_active === 1 ? 'skill' : 'skills'} · ${c.memories} ${c.memories === 1 ? 'memory' : 'memories'} · ${c.documents} ${c.documents === 1 ? 'document' : 'documents'}`));
   if (!d.timeline.length) {
-    page.append(empty('No baseline yet', 'Run /eval run in the terminal to measure where GENESIS starts. The score curve appears here.'));
-    return;
+    page.append(empty('No benchmark baseline yet', 'Run /eval run in the terminal to measure where GENESIS starts. Evidence review is available below.'));
+  } else {
+    const last = d.timeline[d.timeline.length - 1], first = d.timeline[0];
+    page.append(h('h3', { style: 'margin:0', text: `Baseline score: ${Math.round(last.score * 100)}%` }),
+      h('p', { style: 'margin:2px 0 6px;color:var(--dusk);font-size:14px', text: `${d.timeline.length} run${d.timeline.length > 1 ? 's' : ''}, from ${Math.round(first.score * 100)}% on ${last.model}. Rule-based tasks only: this shows measured behaviour, not general intelligence.` }),
+      chart(d.timeline));
+    const body = h('tbody', {}, d.runs.map(r => h('tr', {}, h('td', { text: ago(r.created_at) }), h('td', { text: r.label }), h('td', { text: r.suite }), h('td', { text: Math.round(r.score * 100) + '%' }), h('td', { text: `${r.passed}/${r.total}` }))));
+    page.append(h('h3', { text: 'Recent benchmark runs' }), h('div', { class: 'tbl-wrap' }, h('table', { class: 'tbl' },
+      h('thead', {}, h('tr', {}, ['When', 'Condition', 'Suite', 'Score', 'Passed'].map(t => h('th', { text: t })))), body)));
   }
-  const last = d.timeline[d.timeline.length - 1], first = d.timeline[0];
-  page.append(h('h3', { style: 'margin:0', text: `Baseline score: ${Math.round(last.score * 100)}%` }),
-    h('p', { style: 'margin:2px 0 6px;color:var(--dusk);font-size:14px', text: `${d.timeline.length} run${d.timeline.length > 1 ? 's' : ''}, from ${Math.round(first.score * 100)}% on ${last.model}. Rule-based tasks only: this shows measured behaviour, not general intelligence.` }),
-    chart(d.timeline));
-  const body = h('tbody', {}, d.runs.map(r => h('tr', {}, h('td', { text: ago(r.created_at) }), h('td', { text: r.label }), h('td', { text: r.suite }), h('td', { text: Math.round(r.score * 100) + '%' }), h('td', { text: `${r.passed}/${r.total}` }))));
-  page.append(h('h3', { text: 'Recent runs' }), h('div', { class: 'tbl-wrap' }, h('table', { class: 'tbl' },
-    h('thead', {}, h('tr', {}, ['When', 'Condition', 'Suite', 'Score', 'Passed'].map(t => h('th', { text: t })))), body)));
+
+  page.append(h('h3', { style: 'margin-top:28px', text: 'Experience → reviewed lessons' }),
+    h('p', { class: 'lead', text: 'GENESIS groups only identical normalized task instructions. It does not infer a rule from one success, and nothing is activated automatically.' }));
+  const controls = h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px' });
+  const support = h('input', { type: 'number', min: 2, max: 20, value: 2, style: 'width:76px', 'aria-label': 'Minimum repeated attempts' });
+  const analyze = h('button', { class: 'btn primary', type: 'button', text: 'Analyze experiences', onclick: () => guard(analyze, async () => {
+    const result = await api('/api/evolution/analyze', { method: 'POST', body: { min_support: Number(support.value), limit: 200 } });
+    toast(`Evolution scan: ${result.created} new · ${result.updated} refreshed proposal(s).`);
+    await loadProposals();
+  }) });
+  controls.append(h('label', { style: 'color:var(--dusk);font-size:13px' }, 'Minimum attempts ', support), analyze);
+  page.append(controls);
+  const proposals = h('div', { style: 'display:grid;gap:12px' });
+  page.append(proposals);
+
+  async function loadProposals() {
+    const data = await api('/api/evolution/proposals');
+    proposals.replaceChildren();
+    if (!data.proposals.length) {
+      proposals.append(empty('No lesson proposals yet', 'Complete similar tasks at least twice, then analyze experiences.'));
+      return;
+    }
+    for (const item of data.proposals) {
+      const card = h('section', { class: 'notice' },
+        h('div', { class: 'row' }, h('strong', { text: item.title }), h('span', { class: 'pill', text: item.status })),
+        h('p', { text: item.pattern }),
+        h('p', { style: 'color:var(--dusk);font-size:13px', text: `${item.evidence_count} observations · ${item.completed_count} completed · ${item.blocked_count} blocked · ${item.failed_count} failed · completion ratio ${Math.round(item.confidence * 100)}%` }),
+        h('p', { style: 'color:var(--dusk);font-size:13px', text: 'Evidence IDs: ' + item.evidence_ids.join(', ') }));
+      const actions = h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px' });
+      if (item.status === 'pending') {
+        for (const [label, decision] of [['Accept lesson', 'accept'], ['Reject', 'reject']]) {
+          const button = h('button', { class: 'btn', type: 'button', text: label, onclick: () => guard(button, async () => {
+            await api('/api/evolution/proposals/' + item.id + '/review', { method: 'POST', body: { decision } });
+            await loadProposals();
+          }) });
+          actions.append(button);
+        }
+      }
+      if (item.status === 'accepted') {
+        const draft = h('button', { class: 'btn primary', type: 'button', text: item.skill_id ? 'Open Skill draft in Skills' : 'Create Skill draft', onclick: () => guard(draft, async () => {
+          const result = await api('/api/evolution/proposals/' + item.id + '/skill-draft', { method: 'POST' });
+          toast('Skill draft created. It is not active; review it in Skills.');
+          go('skills');
+        }) });
+        actions.append(draft);
+      }
+      card.append(actions);
+      proposals.append(card);
+    }
+  }
+  try { await loadProposals(); } catch (e) { proposals.append(empty('Could not load proposals', e.message)); }
 }
 
 async function renderSystem() {
