@@ -655,16 +655,16 @@ async function renderEvolution() {
 
   page.append(h('h3', { style: 'margin-top:28px', text: 'Experience → reviewed lessons' }),
     h('p', { class: 'lead', text: 'GENESIS groups only identical normalized task instructions. It does not infer a rule from one success, and nothing is activated automatically.' }));
-  const controls = h('div', { class: 'actions' });
+  const controls = h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px' });
   const support = h('input', { type: 'number', min: 2, max: 20, value: 2, style: 'width:76px', 'aria-label': 'Minimum repeated attempts' });
   const analyze = h('button', { class: 'btn primary', type: 'button', text: 'Analyze experiences', onclick: () => guard(analyze, async () => {
     const result = await api('/api/evolution/analyze', { method: 'POST', body: { min_support: Number(support.value), limit: 200 } });
     toast(`Evolution scan: ${result.created} new · ${result.updated} refreshed proposal(s).`);
     await loadProposals();
   }) });
-  controls.append(h('label', { class: 'muted' }, 'Minimum attempts ', support), analyze);
+  controls.append(h('label', { style: 'color:var(--dusk);font-size:13px' }, 'Minimum attempts ', support), analyze);
   page.append(controls);
-  const proposals = h('div', { class: 'col', style: 'gap:12px' });
+  const proposals = h('div', { style: 'display:grid;gap:12px' });
   page.append(proposals);
 
   async function loadProposals() {
@@ -675,12 +675,12 @@ async function renderEvolution() {
       return;
     }
     for (const item of data.proposals) {
-      const card = h('section', { class: 'panel col', style: 'gap:8px' },
+      const card = h('section', { class: 'notice' },
         h('div', { class: 'row' }, h('strong', { text: item.title }), h('span', { class: 'pill', text: item.status })),
         h('p', { text: item.pattern }),
-        h('p', { class: 'muted', text: `${item.evidence_count} observations · ${item.completed_count} completed · ${item.blocked_count} blocked · ${item.failed_count} failed · completion ratio ${Math.round(item.confidence * 100)}%` }),
-        h('p', { class: 'muted', text: 'Evidence IDs: ' + item.evidence_ids.join(', ') }));
-      const actions = h('div', { class: 'actions' });
+        h('p', { style: 'color:var(--dusk);font-size:13px', text: `${item.evidence_count} observations · ${item.completed_count} completed · ${item.blocked_count} blocked · ${item.failed_count} failed · completion ratio ${Math.round(item.confidence * 100)}%` }),
+        h('p', { style: 'color:var(--dusk);font-size:13px', text: 'Evidence IDs: ' + item.evidence_ids.join(', ') }));
+      const actions = h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px' });
       if (item.status === 'pending') {
         for (const [label, decision] of [['Accept lesson', 'accept'], ['Reject', 'reject']]) {
           const button = h('button', { class: 'btn', type: 'button', text: label, onclick: () => guard(button, async () => {
