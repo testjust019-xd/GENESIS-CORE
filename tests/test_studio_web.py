@@ -71,3 +71,45 @@ def test_stream_forwards_activity_events(tmp_path, monkeypatch):
     assert '"type": "activity"' in body
     assert "read_text_file" in body
     assert '"type": "done"' in body
+
+
+
+def test_evolution_api_proposes_reviewable_skill_draft(tmp_path, monkeypatch):
+    from genesis_core.evolution import EvolutionEngine
+    from genesis_core.experience import ExperienceStore
+    from genesis_core.skills import SkillStore
+
+    state = StateStore(tmp_path / "evolution-api.db")
+    experiences = ExperienceStore(state)
+    skills = SkillStore(state.database_path, set())
+    engine = EvolutionEngine(state, experiences)
+    for task_id in ("one", "two"):
+        experiences.capture_task_result(
+            mission_id="mission-" + task_id,
+            task_id=task_id,
+            title="Check runtime",
+            objective="Verify local runtime",
+            instructions="Inspect the local model endpoint.",
+            outcome="completed",
+            result="Endpoint responded.",
+            observer_summary="The observer confirmed the endpoint response.",
+            confidence=0.9,
+        )
+    monkeypatch.setattr(web, "evolution_engine", engine)
+    monkeypatch.setattr(web, "skill_store", skills)
+
+    result = web.analyze_evolution(web.EvolutionAnalyzeInput())
+    proposal = result["proposals"][0]
+    assert proposal["evidence_count"] == 2
+    assert web.list_evolution_proposals()["count"] == 1
+
+    with pytest.raises(HTTPException) as err:
+        web.promote_evolution_proposal(proposal["id"])
+    assert err.value.status_code == 422
+
+    reviewed = web.review_evolution_proposal(
+        proposal["id"], web.EvolutionDecisionInput(decision="accept", note="Checked.")
+    )
+    assert reviewed["proposal"]["status"] == "accepted"
+    draft = web.promote_evolution_proposal(proposal["id"])
+    assert draft["skill"]["status"] == "draft"
