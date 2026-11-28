@@ -795,8 +795,8 @@ async function renderArtifacts() {
     clearTimeout(previewTimer);
     const policy = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'\">";
     const html = source.value.trimStart();
-    frame.srcdoc = /<head\\b/i.test(html)
-      ? html.replace(/<head\\b[^>]*>/i, head => head + policy)
+    frame.srcdoc = /<head\b/i.test(html)
+      ? html.replace(/<head\b[^>]*>/i, head => head + policy)
       : html.replace(/<!doctype[^>]*>/i, doctype => doctype + policy);
   };
   const updateSize = () => {
