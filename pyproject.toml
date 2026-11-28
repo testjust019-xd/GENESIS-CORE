@@ -25,6 +25,9 @@ genesis = "genesis_core.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+genesis_core = ["static/studio/*"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"

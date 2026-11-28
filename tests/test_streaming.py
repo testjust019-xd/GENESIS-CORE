@@ -82,7 +82,7 @@ def test_studio_stream_endpoint_sends_sse_delta_and_final_message(tmp_path, monk
     monkeypatch.setattr(web, "store", state)
 
     class FakeAgent:
-        def chat(self, session_id, content, on_token=None):
+        def chat(self, session_id, content, on_token=None, on_activity=None, on_approval=None):
             user = state.add_message(session_id, "user", content)
             if on_token:
                 on_token("Hello ")
