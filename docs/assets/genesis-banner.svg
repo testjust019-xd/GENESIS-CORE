@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" role="img" aria-labelledby="title desc">
+  <title id="title">GENESIS CORE</title>
+  <desc id="desc">A local-first AI agent framework, with a softly animated orbital mark.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101426"/>
+      <stop offset="1" stop-color="#171d35"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#79e0ff"/>
+      <stop offset=".55" stop-color="#8e9cff"/>
+      <stop offset="1" stop-color="#83f0c0"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#70d8ff" stop-opacity=".24"/>
+      <stop offset="1" stop-color="#70d8ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <style>
+    .orbit { transform-origin: 158px 160px; animation: spin 18s linear infinite; }
+    .pulse { transform-origin: 158px 160px; animation: breathe 4s ease-in-out infinite; }
+    .shine { animation: drift 8s ease-in-out infinite alternate; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes breathe { 0%,100% { opacity:.55; transform:scale(.96); } 50% { opacity:1; transform:scale(1.04); } }
+    @keyframes drift { from { opacity:.35; } to { opacity:.85; } }
+    @media (prefers-reduced-motion: reduce) {
+      .orbit,.pulse,.shine { animation:none; }
+    }
+  </style>
+  <rect width="1200" height="320" rx="28" fill="url(#bg)"/>
+  <circle cx="158" cy="160" r="132" fill="url(#glow)"/>
+  <g class="pulse">
+    <circle cx="158" cy="160" r="66" fill="#111a2d" stroke="url(#accent)" stroke-width="3"/>
+    <circle cx="135" cy="150" r="8" fill="#8be5ff"/>
+    <circle cx="181" cy="150" r="8" fill="#8be5ff"/>
+    <path d="M137 184 Q158 202 179 184" fill="none" stroke="#8be5ff" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <g class="orbit" fill="none" stroke="url(#accent)" stroke-width="2">
+    <ellipse cx="158" cy="160" rx="112" ry="42" transform="rotate(-28 158 160)" opacity=".85"/>
+    <ellipse cx="158" cy="160" rx="112" ry="42" transform="rotate(52 158 160)" opacity=".5"/>
+    <circle cx="270" cy="105" r="6" fill="#83f0c0" stroke="none"/>
+  </g>
+  <path class="shine" d="M345 76h1" stroke="#8be5ff" stroke-width="2"/>
+  <text x="350" y="145" fill="#f1f5ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="66" font-weight="800" letter-spacing="3">GENESIS CORE</text>
+  <text x="354" y="192" fill="#aeb9d8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="24" letter-spacing="2">LOCAL-FIRST AI AGENT FRAMEWORK</text>
+  <g font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="600">
+    <rect x="354" y="225" width="128" height="34" rx="17" fill="#26334c" stroke="#4a607f"/>
+    <text x="418" y="247" text-anchor="middle" fill="#bdeeff">TERMINAL</text>
+    <rect x="494" y="225" width="112" height="34" rx="17" fill="#26334c" stroke="#4a607f"/>
+    <text x="550" y="247" text-anchor="middle" fill="#bdeeff">STUDIO</text>
+    <rect x="618" y="225" width="130" height="34" rx="17" fill="#26334c" stroke="#4a607f"/>
+    <text x="683" y="247" text-anchor="middle" fill="#bdeeff">ARTIFACTS</text>
+  </g>
+</svg>
